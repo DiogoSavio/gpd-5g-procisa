@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="pt-BR" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPD - Setor Construção 5G PROCISA RJ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js para Gráficos Dinâmicos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet CSS & JS para Mapa de Monitoramento em Tempo Real -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-start p-0 sm:p-4">
+
+    <!-- Container Principal -->
+    <div class="w-full max-w-7xl bg-white shadow-2xl sm:rounded-2xl flex flex-col border border-slate-200 min-h-[95vh]">
+        
+        <!-- ================= BLOCO SUPERIOR FIXO / CONGELADO NA ROLAGEM ================= -->
+        <div class="sticky top-0 z-40 shadow-md sm:rounded-t-2xl bg-white">
+            
+            <!-- Cabeçalho Azul Compacto -->
+            <header class="bg-blue-900 text-white px-4 py-2.5 sm:px-5 sm:py-3 border-b-4 border-cyan-400 sm:rounded-t-2xl space-y-2">
+                
+                <!-- Linha 1 do Cabeçalho -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-cyan-500 text-blue-950 font-black text-xs px-2 py-0.5 rounded tracking-wider">GPD</span>
+                            <h1 class="font-bold text-lg sm:text-xl leading-tight">Gestão de Produção Diária</h1>
+                        </div>
+                        <p class="text-[11px] sm:text-xs text-cyan-200 font-bold mt-0.5" id="header-subtitle">Setor Construção 5G PROCISA RJ</p>
+                    </div>
+
+                    <div class="flex flex-col items-end gap-1.5 w-full sm:w-auto">
+                        <div class="flex items-center justify-end gap-2 w-full sm:w-auto">
+                            <span id="badge-usuario-logado" class="text-[11px] bg-blue-950 px-2.5 py-1 rounded-lg border border-blue-700 hidden">
+                                👤 <span id="txt-email-ativo"></span> (<span id="txt-nivel-ativo" class="text-cyan-300 font-bold"></span>)
+                            </span>
+                            <div id="grupo-botoes-visao-topo" class="flex bg-blue-950 p-1 rounded-xl border border-blue-700">
+                                <button onclick="alternarVisao('campo')" id="btn-modo-campo" class="px-3 py-1.5 text-xs font-medium rounded-lg transition text-cyan-200 hover:text-white">
+                                    📱 Modo Campo
+                                </button>
+                                <button onclick="tentarAcessarGestor()" id="btn-modo-gestor" class="px-3 py-1.5 text-xs font-medium rounded-lg transition bg-white text-blue-950 shadow-sm font-bold">
+                                    🔒 Dashboard Gestor
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="fazerLogoutGestor()" id="btn-sair-gestor" class="bg-red-600 hover:bg-red-700 text-white text-[10px] px-2.5 py-1 rounded-md font-bold shadow-sm transition hidden">
+                            🚪 Sair / Bloquear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Linha 2 e Linha 3 do Cabeçalho Azul (Exclusivas do Modo Gestor) -->
+                <div id="header-gestor-acoes" class="pt-2 border-t border-blue-800/80 space-y-2 hidden">
+                    
+                    <!-- Sub-linha A: Pesquisa Global e Botões de Ação -->
+                    <div class="flex flex-col lg:flex-row justify-between items-center gap-2">
+                        <div class="w-full lg:w-80">
+                            <input type="text" id="inp-busca-global" oninput="atualizarDashboardGestor()" placeholder="🔍 Pesquisar por ID Site, Anel, empresa, equipe..." class="w-full text-xs text-slate-800 border border-blue-700 rounded-lg px-3 py-1.5 outline-none bg-white focus:ring-2 focus:ring-cyan-400 transition">
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 w-full lg:w-auto justify-end items-center">
+                            <span id="lbl-status-autosync" class="text-[10px] bg-blue-950 text-cyan-200 px-2.5 py-1.5 rounded-lg border border-blue-800 font-mono">
+                                ⏱️ Sync (180s): <b id="txt-hora-sync" class="text-white">Ativo</b>
+                            </span>
+                            <button onclick="abrirModalImportarPlanilha()" id="btn-importar-planilha" class="bg-purple-600 hover:bg-purple-700 text-white text-[11px] px-3 py-1.5 rounded-lg font-bold shadow-sm transition flex items-center gap-1">
+                                📤 Importar Carga (Planilha)
+                            </button>
+                            <button onclick="exportarExcelFinanceiro()" id="btn-baixar-excel-gestor" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] px-3 py-1.5 rounded-lg font-bold shadow-sm transition flex items-center gap-1">
+                                📥 Baixar Medição (Excel)
+                            </button>
+                            <button onclick="recarregarDadosGestor()" id="btn-atualizar-registros-gestor" class="bg-cyan-500 hover:bg-cyan-400 text-blue-950 text-[11px] px-3 py-1.5 rounded-lg font-black shadow-sm transition flex items-center gap-1">
+                                🔄 Atualizar Registros
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sub-linha B Integrada no Cabeçalho Azul -->
+                    <div class="bg-blue-950/90 border border-blue-800 px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                        <div class="flex items-center gap-1 shrink-0">
+                            <span class="text-[10px] font-black text-cyan-300 uppercase whitespace-nowrap mr-0.5">⚡ Período:</span>
+                            <button onclick="aplicarAtalhoPeriodo('hoje')" class="bg-cyan-500 hover:bg-cyan-400 text-blue-950 font-black text-[10px] px-2 py-1 rounded-md transition whitespace-nowrap shadow-sm">📅 Hoje</button>
+                            <button onclick="aplicarAtalhoPeriodo('tudo')" class="bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 font-bold text-[10px] px-2 py-1 rounded-md transition whitespace-nowrap">🔄 Tudo</button>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <div class="flex items-center gap-1 bg-white border border-blue-400 rounded-lg px-2 py-0.5">
+                                <span class="text-[10px] font-bold text-slate-500">De:</span>
+                                <input type="date" id="gestor-filtro-data-inicio" onchange="atualizarDashboardGestor()" class="w-[102px] text-[11px] bg-transparent outline-none font-semibold text-slate-800">
+                            </div>
+                            <div class="flex items-center gap-1 bg-white border border-blue-400 rounded-lg px-2 py-0.5">
+                                <span class="text-[10px] font-bold text-slate-500">Até:</span>
+                                <input type="date" id="gestor-filtro-data-fim" onchange="atualizarDashboardGestor()" class="w-[102px] text-[11px] bg-transparent outline-none font-semibold text-slate-800">
+                            </div>
+                            <select id="gestor-filtro-equipe" onchange="atualizarDashboardGestor()" class="w-40 text-[11px] border border-blue-400 rounded-lg px-2 py-1 bg-white outline-none font-semibold text-slate-800 truncate">
+                                <option value="">👥 Todas as Equipes</option>
+                            </select>
+                            <select id="gestor-filtro-projeto" onchange="atualizarDashboardGestor()" class="w-40 text-[11px] border border-blue-400 rounded-lg px-2 py-1 bg-white outline-none font-semibold text-slate-800 truncate">
+                                <option value="">🏗️ Todas as Classes 5G</option>
+                            </select>
+                            <select id="gestor-filtro-desfecho" onchange="atualizarDashboardGestor()" class="w-36 text-[11px] border-2 border-cyan-400 rounded-lg px-2 py-1 bg-cyan-50 outline-none font-bold text-blue-950 truncate">
+                                <option value="">🎯 Todos os Status</option>
+                                <option value="PROGRAMADA">📋 Programadas (Carga)</option>
+                                <option value="EM ANDAMENTO">🔵 Em Andamento</option>
+                                <option value="PARALISADA">⏸️ Paralisadas</option>
+                                <option value="REABERTA">🔄 Reabertas p/ Edição</option>
+                                <option value="CONCLUIDA">🟢 Executado (Concluídas)</option>
+                                <option value="PENDENTE">🟡 Pendentes</option>
+                                <option value="MALOGRADA">🔴 Malogradas</option>
+                            </select>
+                        </div>
+                    </div>
+
+                </div>
+            </header>
+
+            <!-- Sub-Cabeçalho Fixo do Gestor -->
+            <div id="header-gestor-subbarra" class="bg-slate-100 border-b border-slate-300 px-4 py-1.5 hidden">
+                <div class="flex flex-wrap justify-between items-center gap-1.5">
+                    
+                    <div class="flex flex-wrap gap-1 items-center">
+                        <button onclick="mudarSubAbaGestor('atividades')" id="subtab-btn-atividades" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-blue-900 text-white shadow-sm flex items-center gap-1">
+                            📋 Sites / Atividades (<span id="badge-aba-andamento" class="text-cyan-300">0 ativas</span>)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('disponibilidade')" id="subtab-btn-disponibilidade" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            📡 Disponibilidade (<span id="badge-aba-indisp" class="text-red-600 font-black">0 indisp.</span>)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('mapa')" id="subtab-btn-mapa" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            🗺️ Mapa (<span id="badge-aba-mapa" class="text-emerald-600 font-black">0 no mapa</span>)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('combustivel')" id="subtab-btn-combustivel" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            ⛽ Combustível (<span id="badge-aba-combustivel" class="text-orange-600 font-black">0 pend.</span>)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('solicitacao_material')" id="subtab-btn-solicitacao_material" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            🧰 Solic. Material (<span id="badge-aba-solic-material" class="text-indigo-600 font-black">0 pend.</span>)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('graficos')" id="subtab-btn-graficos" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            📊 Gráficos & Metas 5G
+                        </button>
+                        <button onclick="mudarSubAbaGestor('imprevistos')" id="subtab-btn-imprevistos" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            ⚠️ Imprevistos (<span id="badge-aba-imprevistos">0</span>)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('materiais')" id="subtab-btn-materiais" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            📦 Consumo Materiais (SAP/AX)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('financeiro')" id="subtab-btn-financeiro" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            💰 Medição Financeira (Claro x Parceiro)
+                        </button>
+                        <button onclick="mudarSubAbaGestor('equipes')" id="subtab-btn-equipes" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            🛠️ Equipes & Parceiros
+                        </button>
+                        <button onclick="mudarSubAbaGestor('opcoes')" id="subtab-btn-opcoes" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            ⚙️ Opções
+                        </button>
+                        <button onclick="mudarSubAbaGestor('usuarios')" id="subtab-btn-usuarios" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            👥 Usuários
+                        </button>
+                        <button onclick="mudarSubAbaGestor('bonificacao')" id="subtab-btn-bonificacao" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            🏆 Bonificação
+                        </button>
+                        <button onclick="mudarSubAbaGestor('auditoria')" id="subtab-btn-auditoria" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1">
+                            🛡️ Auditoria
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= CORPO ROLÁVEL DO MODO GESTOR ================= -->
+        <main id="view-gestor" class="flex-1 p-4 sm:p-5 bg-slate-50 space-y-5 hidden">
+            
+            <!-- Sub-Aba: Atividades -->
+            <div id="subview-atividades" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-3.5 bg-slate-50 border-b border-slate-200 font-bold text-slate-800 text-xs sm:text-sm flex flex-wrap justify-between items-center gap-2">
+                    <span>📡 Controle de Produção Diária por Site e Anel — Projeto NodeB 5G</span>
+                    <span class="text-xs font-bold bg-blue-100 text-blue-900 px-2.5 py-1 rounded-lg" id="contador-resultados">0 Sites</span>
+                </div>
+                <div class="overflow-x-auto max-h-[68vh]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 z-20 bg-slate-100 shadow-sm">
+                            <tr class="bg-slate-100 text-slate-700 uppercase font-bold text-[9px] tracking-wider border-b">
+                                <th class="p-2.5">Data / ID SITE / Endereço</th>
+                                <th class="p-2.5">Equipe / Empresa / Fiscal</th>
+                                <th class="p-2.5">Classe 5G / ANEL / Métricas</th>
+                                <th class="p-2.5">Status / Desfecho & Fotos</th>
+                                <th class="p-2.5">Horários & Duração</th>
+                                <th class="p-2.5">GPS (Entrada / Saída)</th>
+                                <th class="p-2.5">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-gestor-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SUB-ABA: SOLICITAÇÕES DE RECARGA DE COMBUSTÍVEL EXTRA -->
+            <div id="subview-combustivel" class="bg-white rounded-xl shadow-sm border-2 border-orange-200 overflow-hidden hidden">
+                <div class="p-4 bg-orange-50/70 border-b border-orange-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                        <h3 class="font-black text-orange-950 text-sm uppercase">⛽ Gestão de Solicitações de Recarga de Combustível Extra</h3>
+                    </div>
+                    <span class="text-xs font-black bg-orange-200 text-orange-950 px-3 py-1 rounded-lg" id="contador-solic-combustivel">0 solicitações</span>
+                </div>
+                <div class="overflow-x-auto max-h-[65vh]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 z-20 bg-slate-100">
+                            <tr class="bg-slate-100 text-slate-700 uppercase font-bold text-[9px] border-b">
+                                <th class="p-2.5">Data / Hora</th>
+                                <th class="p-2.5">Técnico / Equipe</th>
+                                <th class="p-2.5">Placa & KM Atual</th>
+                                <th class="p-2.5">Motivo Informado</th>
+                                <th class="p-2.5">Fotos</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-solic-combustivel-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SUB-ABA: SOLICITAÇÕES DE MATERIAL -->
+            <div id="subview-solicitacao_material" class="bg-white rounded-xl shadow-sm border-2 border-indigo-200 overflow-hidden hidden">
+                <div class="p-4 bg-indigo-50/70 border-b border-indigo-200 flex justify-between items-center">
+                    <h3 class="font-black text-indigo-950 text-sm uppercase">🧰 Gestão de Solicitações de Material de Campo (SAP / AX)</h3>
+                    <span class="text-xs font-black bg-indigo-200 text-indigo-950 px-3 py-1 rounded-lg" id="contador-solic-material">0 solicitações</span>
+                </div>
+                <div class="overflow-x-auto max-h-[65vh]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 z-20 bg-slate-100">
+                            <tr class="bg-slate-100 text-slate-700 uppercase font-bold text-[9px] border-b">
+                                <th class="p-2.5">Data / Hora</th>
+                                <th class="p-2.5">Técnico / Equipe</th>
+                                <th class="p-2.5">Itens Solicitados</th>
+                                <th class="p-2.5">Observações</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-solic-material-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sub-Aba: Disponibilidade -->
+            <div id="subview-disponibilidade" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden p-4">
+                <h3 class="font-bold text-slate-800 text-sm mb-3">📡 Painel de Disponibilidade e Turno das Equipes 5G (Hoje)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 uppercase font-bold text-[9px] border-b">
+                                <th class="py-2 px-3">Técnico / Equipe</th>
+                                <th class="py-2 px-3">Classe 5G</th>
+                                <th class="py-2 px-3">Turno Hoje</th>
+                                <th class="py-2 px-3">Status Atual</th>
+                                <th class="py-2 px-3">Detalhe / Site</th>
+                                <th class="py-2 px-3">Último GPS</th>
+                                <th class="py-2 px-3">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-disponibilidade-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SUB-ABA: MAPA EM TEMPO REAL -->
+            <div id="subview-mapa" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden p-4 space-y-4">
+                <h3 class="font-bold text-slate-800 text-base">🗺️ Mapa de Monitoramento GPS das Equipes 5G em Tempo Real</h3>
+                <div id="mapa-rastreio-equipes" class="w-full h-[500px] rounded-xl border-2 border-slate-300 z-10"></div>
+            </div>
+
+            <!-- Sub-Aba: Imprevistos -->
+            <div id="subview-imprevistos" class="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden hidden p-4">
+                <h3 class="font-bold text-amber-950 text-sm mb-3">⚠️ Relatório de Imprevistos e Atrasos Operacionais</h3>
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-700 uppercase font-bold text-[9px] border-b">
+                            <th class="p-2.5">Data / Horários</th>
+                            <th class="p-2.5">Equipe</th>
+                            <th class="p-2.5">Motivo</th>
+                            <th class="p-2.5">Situação</th>
+                            <th class="p-2.5">Detalhes</th>
+                            <th class="p-2.5">GPS</th>
+                            <th class="p-2.5">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-imprevistos-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                </table>
+            </div>
+
+            <!-- SUB-ABA: GRÁFICOS & PRODUTIVIDADE 5G -->
+            <div id="subview-graficos" class="space-y-6 hidden">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <span class="text-xs font-black text-slate-800 uppercase">📌 Painel Executivo Construção 5G Separado por Classes: LANÇAMENTO • FUSÃO • OBRA</span>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3">
+                        <div class="bg-blue-50 border-2 border-blue-300 p-3.5 rounded-xl">
+                            <span class="font-black text-blue-950 text-xs uppercase block">🚀 1. LANÇAMENTO 5G</span>
+                            <span class="text-2xl font-black text-blue-800" id="card-vist-consolidado">0</span>
+                            <span class="text-[10px] text-slate-500 block">Sites Executados</span>
+                        </div>
+                        <div class="bg-amber-50 border-2 border-amber-300 p-3.5 rounded-xl">
+                            <span class="font-black text-amber-950 text-xs uppercase block">⚡ 2. FUSÃO 5G</span>
+                            <span class="text-2xl font-black text-amber-800" id="card-inst-consolidado">0</span>
+                            <span class="text-[10px] text-slate-500 block">Sites Executados</span>
+                        </div>
+                        <div class="bg-cyan-50 border-2 border-cyan-300 p-3.5 rounded-xl">
+                            <span class="font-black text-cyan-950 text-xs uppercase block">🏗️ 3. OBRA CIVIL / SUBTERRÂNEA 5G</span>
+                            <span class="text-2xl font-black text-cyan-800" id="card-ativ-consolidado">0</span>
+                            <span class="text-[10px] text-slate-500 block">Sites Executados</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub-Aba: Materiais -->
+            <div id="subview-materiais" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden p-4">
+                <h3 class="font-bold text-slate-800 text-sm mb-3">📦 Relatório Consolidado de Materiais Cliente (SAP) & Materiais Procisa (AX)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 uppercase font-bold text-[9px] border-b">
+                                <th class="p-2.5">Site / Data</th>
+                                <th class="p-2.5">Equipe / Empresa</th>
+                                <th class="p-2.5">Cabo FO 72F (SAP 22067771)</th>
+                                <th class="p-2.5">Cx FOSC100 (SAP 22068144)</th>
+                                <th class="p-2.5">DGO 72F (SAP 22007782)</th>
+                                <th class="p-2.5">Fusões (3.13)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-materiais-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sub-Aba: Financeiro -->
+            <div id="subview-financeiro" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden space-y-4 p-4">
+                <div class="flex flex-col sm:flex-row justify-between items-center border-b pb-3 gap-3">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-base">💰 Medição Financeira 5G (Repasse Cliente Claro vs. Medição LPU Parceiro)</h3>
+                        <p class="text-xs text-slate-500">Atividades realizadas por equipe própria (PROCISA) contabilizam R$ 0,00 em custo parceiro.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="exportarExcelFinanceiro()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-sm transition">
+                            📥 Exportar Medição (Excel)
+                        </button>
+                        <div class="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl text-right">
+                            <span class="text-[10px] font-bold text-emerald-800 uppercase block">Receita Total Cliente (Claro)</span>
+                            <span class="text-xl font-black text-emerald-700" id="fin-total-geral">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 uppercase font-semibold text-[10px] tracking-wider border-b">
+                                <th class="p-3">Código</th>
+                                <th class="p-3">Descrição do Item</th>
+                                <th class="p-3">Unidade</th>
+                                <th class="p-3 text-center">Qtd. Produzida</th>
+                                <th class="p-3 text-right">R$ Unitário</th>
+                                <th class="p-3 text-right">Total (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-financeiro-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sub-Aba: Equipes -->
+            <div id="subview-equipes" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4 hidden">
+                <div class="border-b pb-2 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm">🛠️ Gestão de Equipes, Colaboradores e Empreiteiras Parceiras (5G)</h3>
+                        <p class="text-[11px] text-slate-500">Cadastre Equipes Próprias (PROCISA com Matrícula) ou Parceiras, CPF, RG, Nome da Mãe, Fiscal e Área de Atuação.</p>
+                    </div>
+                    <button onclick="abrirModalEquipe()" class="bg-blue-900 hover:bg-blue-950 text-white text-xs px-3 py-2 rounded-lg font-bold" id="btn-nova-equipe">+ Cadastrar Equipe / Colaborador</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 uppercase font-semibold text-[10px] tracking-wider border-b">
+                                <th class="p-3">Nº Equipe / Colaborador & PIN</th>
+                                <th class="p-3">Empresa & Matrícula</th>
+                                <th class="p-3">CPF / RG / Contato / Mãe</th>
+                                <th class="p-3">Classe de Atuação</th>
+                                <th class="p-3">Fiscal & Área de Atuação</th>
+                                <th class="p-3">Status & Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-equipes-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sub-Aba: Opções -->
+            <div id="subview-opcoes" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-5 hidden">
+                <h3 class="font-bold text-slate-800 text-sm">⚙️ Configurações de Opções, Parceiros e Catálogos 5G</h3>
+                <div id="painel-capacidade-opcoes" class="bg-slate-50 border border-slate-200 rounded-xl p-4"></div>
+            </div>
+
+            <!-- Sub-Aba: Usuários -->
+            <div id="subview-usuarios" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4 hidden">
+                <h3 class="font-bold text-slate-800 text-sm">👥 Controle de Acesso e Usuários</h3>
+                <table class="w-full text-left border-collapse text-xs">
+                    <tbody id="tabela-usuarios-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                </table>
+            </div>
+
+            <!-- Sub-Aba: Bonificação -->
+            <div id="subview-bonificacao" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hidden">
+                <h3 class="font-bold text-slate-800 text-base">🏆 Dashboard de Bonificação e Metas por Site</h3>
+            </div>
+
+            <!-- Sub-Aba: Auditoria -->
+            <div id="subview-auditoria" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hidden">
+                <h3 class="font-bold text-slate-800 text-sm">🛡️ Trilha de Auditoria</h3>
+                <table class="w-full text-left border-collapse text-xs">
+                    <tbody id="tabela-auditoria-corpo" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                </table>
+            </div>
+
+        </main>
+
+        <!-- ================= MODO CAMPO (ULTRA-LEVE PARA SMARTPHONE) ================= -->
+        <main id="view-campo" class="flex-1 p-4 bg-slate-50 flex justify-center items-start sm:items-center">
+            <div class="w-full max-w-md bg-white shadow-lg rounded-2xl p-4 space-y-4 border border-slate-200">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <h2 class="font-bold text-slate-800 text-sm">GPD - Lançamento de Campo</h2>
+                            <span id="badge-modo-leve-4g" class="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-300">⚡ 5G Leve</span>
+                        </div>
+                        <p class="text-[10px] text-blue-900 font-bold">Setor Construção 5G • PROCISA RJ</p>
+                    </div>
+                    <span class="text-[11px] bg-blue-50 text-blue-900 px-2.5 py-1 rounded-lg font-bold" id="current-user-team">Selecione Equipe</span>
+                </div>
+
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" onclick="abrirModalSolicitacaoCombustivelCampo()" class="bg-orange-600 hover:bg-orange-700 text-white font-black py-2 px-2 rounded-xl text-[11px] transition shadow-sm">
+                            ⛽ Solicitar Combustível
+                        </button>
+                        <button type="button" onclick="abrirModalSolicitacaoMaterialCampo()" class="bg-indigo-700 hover:bg-indigo-800 text-white font-black py-2 px-2 rounded-xl text-[11px] transition shadow-sm">
+                            🧰 Solicitar Material
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button type="button" id="btn-aba-campo-lancamento" onclick="mudarSubAbaCampo('lancamento')" class="py-2 px-3 rounded-lg font-bold text-xs transition bg-blue-900 text-white shadow-sm">
+                        🚀 Atendimento Site
+                    </button>
+                    <button type="button" id="btn-aba-campo-painel" onclick="mudarSubAbaCampo('painel')" class="py-2 px-3 rounded-lg font-bold text-xs transition bg-white text-slate-700">
+                        📋 Meus Sites (<span id="badge-qtd-minhas-ativ">0</span>)
+                    </button>
+                </div>
+
+                <div id="subview-campo-lancamento" class="space-y-4">
+                    <div id="box-ultimo-resumo-whats" class="bg-emerald-50 border border-emerald-300 p-3 rounded-xl space-y-2 hidden">
+                        <div class="flex justify-between items-center">
+                            <span class="text-[11px] font-bold text-emerald-900">✅ Site Salvo com Sucesso!</span>
+                            <button onclick="document.getElementById('box-ultimo-resumo-whats').classList.add('hidden')" class="text-emerald-700 font-bold text-xs">✕</button>
+                        </div>
+                        <button onclick="copiarUltimoResumoCampoWhatsApp()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-xs transition shadow-sm">
+                            📲 Copiar Resumo 5G para WhatsApp
+                        </button>
+                    </div>
+
+                    <div id="form-campo-container" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Equipe / Colaborador</label>
+                            <select id="sel-equipe" onchange="aoSelecionarEquipeCampo()" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 bg-white outline-none">
+                                <option value="">Selecione a Equipe...</option>
+                            </select>
+                            <div id="barra-seguranca-pin-campo" class="mt-1.5 flex items-center justify-between bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] hidden"></div>
+                        </div>
+
+                        <div id="box-controle-expediente-campo" class="p-3 rounded-xl border-2 border-slate-200 bg-slate-50 space-y-2 hidden">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[11px] font-black text-slate-800 uppercase" id="lbl-status-expediente-campo">Turno Não Iniciado</span>
+                                <span id="lbl-hora-inicio-expediente" class="text-[10px] font-mono bg-white px-2 py-0.5 rounded border">Início: --:--</span>
+                            </div>
+                            <button type="button" id="btn-iniciar-expediente-campo" onclick="iniciarExpedienteRastreioCampo()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 rounded-xl text-xs">
+                                🟢 Iniciar Expediente / Ficar Disponível em Rota
+                            </button>
+                            <button type="button" id="btn-encerrar-expediente-campo" onclick="encerrarExpedienteRastreioCampo()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-xl text-xs hidden">
+                                🔴 Encerrar Expediente do Dia
+                            </button>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="block text-xs font-semibold text-slate-600">Classe / Atividade 5G</label>
+                                <span id="badge-setor-campo" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Selecione o técnico</span>
+                            </div>
+                            <select id="sel-projeto" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 bg-white outline-none font-bold text-blue-950">
+                                <option value="">Selecione primeiro o técnico acima...</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">📡 ID SITE *</label>
+                            <input type="text" id="inp-imovel" placeholder="Ex: RJ-NDB-001" class="w-full text-sm font-bold uppercase border border-slate-300 rounded-lg p-2.5 outline-none">
+                        </div>
+
+                        <div class="pt-2 flex flex-col gap-2">
+                            <button onclick="fazerCheckIn()" id="btn-checkin" class="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm">
+                                🚀 Iniciar Atividade no Site (Status: Em Andamento)
+                            </button>
+                            <button onclick="abrirModalImprevisto()" type="button" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm">
+                                ⚠️ Informar Imprevisto / Atraso
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="bloco-pos-abertura" class="space-y-3 hidden">
+                        <div class="bg-blue-50 p-3 rounded-xl border border-blue-200 text-xs space-y-1.5">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-black text-blue-950 uppercase text-[11px]" id="lbl-status-execucao-campo">Status: Em Andamento no Painel</span>
+                                    <p class="mt-1"><strong>Site / Anel:</strong> <span id="lbl-imovel-aberto" class="font-bold text-blue-900">-</span></p>
+                                    <p><strong>Entrada:</strong> <span id="lbl-h-entrada">-</span></p>
+                                    <p><strong>GPS Real:</strong> <span id="lbl-gps-entrada" class="font-mono text-[10px] text-emerald-700 font-bold">-</span></p>
+                                </div>
+                                <button type="button" onclick="cancelarCheckinAberto()" class="text-[10px] bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded font-bold">
+                                    ✕ Cancelar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="corpo-formulario-blocos-campo" class="space-y-3 border-t pt-3">
+                            <div class="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-800">📍 Endereço e Bairro do Site <span class="text-red-600">(Obrigatório)</span></label>
+                                    <input type="text" id="form-endereco" placeholder="Ex: Av. Pastor Martin Luther King Jr - DEL CASTILHO" class="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white outline-none">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div><label class="block text-[11px] font-semibold text-slate-600">👮 Fiscal Responsável</label><input type="text" id="form-responsavel" readonly class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-100 font-bold"></div>
+                                    <div><label class="block text-[11px] font-semibold text-slate-600">🔄 Anel</label><input type="text" id="form-contato" readonly class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-100 font-bold"></div>
+                                </div>
+                            </div>
+
+                            <div id="container-blocos-dinamicos" class="space-y-4"></div>
+
+                            <button onclick="salvarRegistro()" id="btn-salvar-final" class="w-full bg-blue-900 hover:bg-blue-950 text-white font-black py-3 rounded-xl text-sm transition shadow-md">
+                                💾 Finalizar e Salvar Atendimento 5G
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="subview-campo-painel" class="space-y-3 hidden">
+                    <div id="lista-minhas-atividades-campo" class="space-y-2.5 max-h-[65vh] overflow-y-auto"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAIS AUXILIARES -->
+    <div id="modal-equipe" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center p-4 hidden z-50"></div>
+    <div id="modal-solic-combustivel" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center p-4 hidden z-[76]"></div>
+    <div id="modal-solic-material" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center p-4 hidden z-[76]"></div>
+    <div id="modal-imprevisto" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center p-4 hidden z-50"></div>
+    <div id="modal-zoom-foto" class="fixed inset-0 bg-black/85 backdrop-blur-sm flex flex-col justify-center items-center p-4 hidden z-[85]">
+        <img id="img-zoom-alvo" src="" class="max-h-[75vh] w-auto rounded-xl">
+    </div>
+
+    <!-- IMPORTAÇÃO DOS MÓDULOS EXTERNOS -->
+    <script src="nuvem.js"></script>
+    <script src="campo.js"></script>
+    <script src="gestor.js"></script>
+</body>
+</html>
