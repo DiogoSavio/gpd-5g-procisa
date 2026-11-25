@@ -1,4 +1,4 @@
-// ================= NUVEM.JS - SETOR CONSTRUÇÃO 5G • PROCISA RJ (V2 COMPLETA) =================
+// ================= NUVEM.JS - SETOR CONSTRUÇÃO 5G • PROCISA RJ (V3) =================
 const SUPABASE_URL = "https://ceehwsoitppskjipcqqs.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_4IThgbQyoR36PE6le5P9rQ_DYckrEXS";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -11,68 +11,63 @@ const ID_NUVEM_AUDITORIA = 999999005;
 
 const PROJETO_SOLIC_COMBUSTIVEL = "__SOLIC_COMBUSTIVEL__";
 const PROJETO_SOLIC_MATERIAL    = "__SOLIC_MATERIAL__";
-const PRAZO_EXPURGO_48H_MS      = 48 * 60 * 60 * 1000;
+const EMAIL_MASTER_UNICO        = "diogo.savio@procisa.com.br";
 const ORDEM_SETORES             = ["Lançamento", "Fusão", "Obra"];
 let cargaInicialGestorConcluida = false;
 
-// ================= CATÁLOGO DE EMPREITEIRAS / PARCEIROS =================
+// ================= CATÁLOGO DE PARCEIROS E FISCAIS =================
 const CATALOGO_PARCEIROS_PADRAO = [
     { nome: "PROCISA", responsavel: "DIOGO SAVIO CANONGIA FURTADO", classe: "OBRA, LANÇAMENTO E FUSÃO", tipo: "PROPRIA" },
-    { nome: "ALTA FUSÃO", responsavel: "DIOGO SAVIO CANONGIA FURTADO", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
-    { nome: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", responsavel: "DIOGO SAVIO CANONGIA FURTADO", classe: "OBRA, LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
-    { nome: "MASTER SERVIÇOS DE TELECOMUNICAÇÕES LTDA -ME", responsavel: "DIOGO SAVIO CANONGIA FURTADO", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
-    { nome: "NOVA PENIEL TELECOM", responsavel: "DIOGO SAVIO CANONGIA FURTADO", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
-    { nome: "R11 TELECOM", responsavel: "DIOGO SAVIO CANONGIA FURTADO", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
-    { nome: "RVS SOLUÇÕES", responsavel: "DIOGO SAVIO CANONGIA FURTADO", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
-    { nome: "L&C", responsavel: "DIEGO ALVES JARDIM DOS SANTOS", classe: "OBRA", tipo: "PARCEIRO" }
+    { nome: "ALTA FUSÃO", responsavel: "SILMAR LEITE", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
+    { nome: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", responsavel: "SILMAR LEITE", classe: "OBRA, LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
+    { nome: "MASTER SERVIÇOS DE TELECOMUNICAÇÕES LTDA -ME", responsavel: "ADEMIR MUNIZ", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
+    { nome: "NOVA PENIEL TELECOM", responsavel: "DIEGO ALVES", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
+    { nome: "R11 TELECOM", responsavel: "DIEGO ALVES", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
+    { nome: "RVS SOLUÇÕES", responsavel: "DIEGO ALVES", classe: "LANÇAMENTO E FUSÃO", tipo: "PARCEIRO" },
+    { nome: "L&C", responsavel: "DIEGO SOARES", classe: "OBRA", tipo: "PARCEIRO" }
 ];
 
-// ================= FISCAIS OFICIAIS CONSTRUÇÃO 5G =================
 const CATALOGO_FISCAIS_PADRAO = [
-    { nome: "DIEGO ALVES JARDIM DOS SANTOS", regiao: "ZONA OESTE", matricula: "150076" },
-    { nome: "FABIO SANTOS DE MELLO BARBOSA", regiao: "ZONA NORTE", matricula: "150079" },
+    { nome: "DIEGO ALVES", regiao: "ZONA OESTE", matricula: "150076" },
+    { nome: "FABIO BARBOSA", regiao: "ZONA NORTE/BAIXADA", matricula: "150079" },
+    { nome: "ADEMIR MUNIZ", regiao: "ZONA SUL/NITERÓI", matricula: "150403" },
+    { nome: "SILMAR LEITE", regiao: "VIAGEM", matricula: "150024" },
     { nome: "FABIO MANUEL DA SILVA", regiao: "BAIXADA", matricula: "150299" },
-    { nome: "ADEMIR DA COSTA MUNIZ", regiao: "ZONA SUL/CENTRO/NITEROI", matricula: "150403" },
-    { nome: "SILMAR LEITE RIBEIRO", regiao: "VIAGEM", matricula: "150024" },
-    { nome: "ALEXANDRE NAVEGA DE LIMA", regiao: "INTERNO", matricula: "150026" },
-    { nome: "DIOGO SAVIO CANONGIA FURTADO", regiao: "GESTÃO GERAL", matricula: "150451" }
+    { nome: "ALEXANDRE NAVEGA DE LIMA", regiao: "INTERNO", matricula: "150026" }
 ];
 
-// ================= BASE INICIAL DE EQUIPES PROCISA 5G (PLANILHA OFICIAL) =================
-const BASE_EQUIPES_PROCISA_5G = [
-    { id: 150058, numeroEquipe: "L-01", matricula: "150058", nome: "SIDNEY DOS SANTOS SILVA", funcao: "LIDER DE EQUIPE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "ZONA NORTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150061, numeroEquipe: "L-02", matricula: "150061", nome: "ANDRE LUIS BORGES DE LIMA", funcao: "LIDER DE EQUIPE", empresa: "PROCISA", setor: "Lançamento", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "ZONA OESTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150074, numeroEquipe: "L-03", matricula: "150074", nome: "HONOFRE ALUISIO CEZARIO", funcao: "LIDER DE EQUIPE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO MANUEL DA SILVA", areaAtuacao: "BAIXADA", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150297, numeroEquipe: "L-04", matricula: "150297", nome: "SEBASTIAO DE OLIVEIRA MENDONCA", funcao: "LIDER DE EQUIPE", empresa: "PROCISA", setor: "Lançamento", fiscal: "ADEMIR DA COSTA MUNIZ", areaAtuacao: "ZONA SUL/CENTRO/NITEROI", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150472, numeroEquipe: "L-05", matricula: "150472", nome: "NICKSON WILLIAM VIANNA DOS SANTOS", funcao: "LIDER DE EQUIPE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "ZONA NORTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 151146, numeroEquipe: "L-06", matricula: "151146", nome: "RAFAEL PESSOA PEREIRA", funcao: "LIDER DE EQUIPE", empresa: "PROCISA", setor: "Lançamento", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "ZONA OESTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150251, numeroEquipe: "F-01", matricula: "150251", nome: "MARLON RANGEL ACIOLI", funcao: "TEC FIBRA OPTICA JR", empresa: "PROCISA", setor: "Fusão", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "ZONA NORTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150273, numeroEquipe: "F-02", matricula: "150273", nome: "DOUGLAS REIS DA SILVA", funcao: "TEC FIBRA OPTICA JR", empresa: "PROCISA", setor: "Fusão", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "ZONA OESTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150805, numeroEquipe: "F-03", matricula: "150805", nome: "LUIZ CLAUDIO NOVAIS DA SILVA", funcao: "TEC FIBRA OPTICA PL", empresa: "PROCISA", setor: "Fusão", fiscal: "ADEMIR DA COSTA MUNIZ", areaAtuacao: "ZONA SUL/CENTRO/NITEROI", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 153507, numeroEquipe: "F-04", matricula: "153507", nome: "JONATAS DA VEIGA ALMEIDA", funcao: "TEC FIBRA OPTICA JR", empresa: "PROCISA", setor: "Fusão", fiscal: "FABIO MANUEL DA SILVA", areaAtuacao: "BAIXADA", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 151101, numeroEquipe: "F-05", matricula: "151101", nome: "REGINALDO ROSA DA SILVA", funcao: "AJ DE FIBRA OPTICA", empresa: "PROCISA", setor: "Fusão", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "ZONA NORTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 152291, numeroEquipe: "F-06", matricula: "152291", nome: "CARLOS VINICIUS CORREIA DOS SANTOS", funcao: "AJ DE FIBRA OPTICA", empresa: "PROCISA", setor: "Fusão", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "ZONA OESTE", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150067, numeroEquipe: "OF-01", matricula: "150067", nome: "TONY LOURENCO GRIPP", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150083, numeroEquipe: "OF-02", matricula: "150083", nome: "GILMAR FRANCISCO DA SILVA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150402, numeroEquipe: "OF-03", matricula: "150402", nome: "CLAUDECIR FERREIRA DE OLIVEIRA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO MANUEL DA SILVA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150473, numeroEquipe: "OF-04", matricula: "150473", nome: "MARCO AURELIO JACINTO DOS SANTOS", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "ADEMIR DA COSTA MUNIZ", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 150662, numeroEquipe: "OF-05", matricula: "150662", nome: "JULIO FLAVIO PINTO DE SIQUEIRA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "ADEMIR DA COSTA MUNIZ", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 151302, numeroEquipe: "OF-06", matricula: "151302", nome: "VICTOR OLIVEIRA DOS SANTOS", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 151303, numeroEquipe: "OF-07", matricula: "151303", nome: "ANTONIO CARLOS MOREIRA FELISBERTO", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 151362, numeroEquipe: "OF-08", matricula: "151362", nome: "DANIEL SILVA DE MOURA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 152205, numeroEquipe: "OF-09", matricula: "152205", nome: "ROGERIO SILVA DE OLIVEIRA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO MANUEL DA SILVA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 152206, numeroEquipe: "OF-10", matricula: "152206", nome: "SAMUEL SOARES BARBOSA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO MANUEL DA SILVA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 152209, numeroEquipe: "OF-11", matricula: "152209", nome: "JOAO HENRIQUE SILVA DE FARIAS", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 152939, numeroEquipe: "OF-12", matricula: "152939", nome: "LUCAS GABRIEL DA COSTA DANTE", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "ADEMIR DA COSTA MUNIZ", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 153024, numeroEquipe: "OF-13", matricula: "153024", nome: "AUGUSTO CESAR CESARIO DE OLIVEIRA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 153612, numeroEquipe: "OF-14", matricula: "153612", nome: "WESLEY CARNEIRO DA SILVA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO MANUEL DA SILVA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 153615, numeroEquipe: "OF-15", matricula: "153615", nome: "FRANCISCO NEVES DA SILVA", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "DIEGO ALVES JARDIM DOS SANTOS", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 153636, numeroEquipe: "OF-16", matricula: "153636", nome: "WELLINGTON DE JESUS ANJOS SANTOS", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "ADEMIR DA COSTA MUNIZ", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 153641, numeroEquipe: "OF-17", matricula: "153641", nome: "ALLAN VICTOR BRITO CARRILHO", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO SANTOS DE MELLO BARBOSA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" },
-    { id: 154598, numeroEquipe: "OF-18", matricula: "154598", nome: "LUIZ FERNANDO OLIVEIRA ANTONIO", funcao: "OFICIAL DE REDE", empresa: "PROCISA", setor: "Lançamento", fiscal: "FABIO MANUEL DA SILVA", areaAtuacao: "RJ", veiculo: "", status: "Ativo", pin: "1234" }
+// ================= 24 CABEÇAS DE EQUIPE OFICIAIS (12 LANÇAMENTO + 12 FUSÃO) =================
+const BASE_CABECAS_EQUIPE_5G = [
+    // --- LANÇAMENTO (12 EQUIPES - LARANJA) ---
+    { id: 1001, numeroEquipe: "L-01", matricula: "150472", nome: "NICKSON WILLIAM VIANNA DOS SANTOS", rg: "23.143.385-5", cpf: "142.281.637-00", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1002, numeroEquipe: "L-02", matricula: "150074", nome: "HONOFRE ALUISIO CEZARIO", rg: "11.833.674-2", cpf: "078.003.067-20", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "ADEMIR MUNIZ", areaAtuacao: "ZONA SUL/NITERÓI", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1003, numeroEquipe: "L-03", matricula: "150061", nome: "ANDRE LUIS BORGES DE LIMA", rg: "10.367.152-5", cpf: "044.304.557-75", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1004, numeroEquipe: "L-04", matricula: "151146", nome: "RAFAEL PESSOA PEREIRA", rg: "13.241.312-1", cpf: "100.088.697-23", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1005, numeroEquipe: "L-05", matricula: "150058", nome: "SIDNEY DOS SANTOS SILVA", rg: "92182013", cpf: "019.558.447-39", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1006, numeroEquipe: "L-06", matricula: "", nome: "NILTON CESAR DE SOUZA CHAGAS", rg: "21.646.858-7", cpf: "099.645.187-06", empresa: "ALTA FUSÃO", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1007, numeroEquipe: "L-07", matricula: "", nome: "CARLOS EVANILDO SANTOS DE ABREU", rg: "35.600.764-1", cpf: "973.545.200-63", empresa: "ALTA FUSÃO", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1008, numeroEquipe: "L-08", matricula: "", nome: "JONATAN DA COSTA VELENTIM", rg: "21.398.900-7", cpf: "058.645.137-41", empresa: "R11 TELECOM", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1009, numeroEquipe: "L-09", matricula: "", nome: "VICTOR PIMENTEL DOS SANTOS", rg: "12.982.832-3", cpf: "118.532.287-61", empresa: "RVS SOLUÇÕES", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1010, numeroEquipe: "L-10", matricula: "", nome: "RODRIGO PESSOA PEREIRA", rg: "20.529.008-3", cpf: "114.530.177-04", empresa: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1011, numeroEquipe: "L-11", matricula: "", nome: "ADILSON ADRIANO FERREIRA", rg: "12.007.906-6", cpf: "053.867.117-33", empresa: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 1012, numeroEquipe: "L-12", matricula: "", nome: "MAICON JORGE DE SÁ DA SILVA", rg: "25.603.811-8", cpf: "155.079.357-85", empresa: "RVS SOLUÇÕES", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+
+    // --- FUSÃO (12 EQUIPES - AZUL) ---
+    { id: 2001, numeroEquipe: "F-01", matricula: "153507", nome: "JONATAS DA VEIGA ALMEIDA", rg: "21.247.926-5", cpf: "120.221.577-70", empresa: "PROCISA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2002, numeroEquipe: "F-02", matricula: "150251", nome: "MARLON RANGEL ACIOLI", rg: "24.829.110-6", cpf: "152.929.367-74", empresa: "PROCISA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2003, numeroEquipe: "F-03", matricula: "150273", nome: "DOUGLAS REIS DA SILVA", rg: "28.952.310-2", cpf: "162.891.647-83", empresa: "PROCISA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2004, numeroEquipe: "F-04", matricula: "", nome: "EDGAR PARADIZZO CELESTINO", rg: "10080866", cpf: "079.381.247-02", empresa: "R11 TELECOM", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2005, numeroEquipe: "F-05", matricula: "150805", nome: "LUIZ CLAUDIO NOVAIS DA SILVA", rg: "20.457.560-9", cpf: "125.632.087-00", empresa: "PROCISA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "ADEMIR MUNIZ", areaAtuacao: "ZONA SUL/NITERÓI", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2006, numeroEquipe: "F-06", matricula: "", nome: "THIAGO AGUIAR MAIA PIMENTA", rg: "30.643.620-5", cpf: "177.136.567-66", empresa: "MASTER SERVIÇOS DE TELECOMUNICAÇÕES LTDA -ME", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "ADEMIR MUNIZ", areaAtuacao: "ZONA SUL/NITERÓI", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2007, numeroEquipe: "F-07", matricula: "", nome: "PEDRO CLAUDINO DA SILVA", rg: "28.723.158-3", cpf: "170.740.357-00", empresa: "NOVA PENIEL TELECOM", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2008, numeroEquipe: "F-08", matricula: "", nome: "EDUARDO CHRISTIAN QUEIROZ DE LEMOS", rg: "21.800.600-5", cpf: "114.535.647-80", empresa: "NOVA PENIEL TELECOM", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2009, numeroEquipe: "F-09", matricula: "", nome: "ALESSANDRO GOMES DE OLIVEIRA", rg: "20.876.430-8", cpf: "116.907.577-01", empresa: "ALTA FUSÃO", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2010, numeroEquipe: "F-10", matricula: "", nome: "ALEX SANDRO BRITO CHAGAS", rg: "21.545.423-2", cpf: "134.073.087-10", empresa: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2011, numeroEquipe: "F-11", matricula: "", nome: "ATILA DOUGLAS MALHEIRO DA SILVA", rg: "102.649.967-47", cpf: "102.649.967-47", empresa: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
+    { id: 2012, numeroEquipe: "F-12", matricula: "", nome: "EDGAR ROBERTO LOPES", rg: "29.710.08-4", cpf: "165.426.467-95", empresa: "MASTER SERVIÇOS DE TELECOMUNICAÇÕES LTDA -ME", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true }
 ];
 
-// ================= TABELAS DE MÃO DE OBRA 5G ATUALIZADAS (LARANJA = LANÇAMENTO | AZUL = FUSÃO) =================
+// ================= TABELAS DE MÃO DE OBRA 5G =================
 const CATALOGO_MAO_DE_OBRA_5G = {
     "Lançamento": [
         { codigo: "1.11", itemV: "186", desc: "ADEQUAÇÃO DE POSTES (EQUIPAMENTOS / FERRAGENS)", un: "UNIT", precoCliente: 57.62, precoParceiro: 34.57 },
@@ -115,6 +110,7 @@ const CATALOGO_MATERIAIS_CLIENTE_SAP = [
 ];
 
 const CATALOGO_MATERIAIS_PROCISA_AX = [
+    // Materiais Exclusivos de LANÇAMENTO
     { item: "1.1.2", desc: "BAP 3-ABRAÇADEIRA AJUSTÁVEL PARA POSTE- Ø MENOR 270MM - Ø MAIOR 310MM", codAx: "00009027", un: "UNIT", valor: 10.23, classes: ["Lançamento"] },
     { item: "1.1.5", desc: "SUPORTE P/ ISOLADOR_RE VERT.", codAx: "00009202", un: "UNIT", valor: 11.14, classes: ["Lançamento"] },
     { item: "1.1.6", desc: "ISOLADOR PORCELANA 72 X 72", codAx: "00009210", un: "UNIT", valor: 4.59, classes: ["Lançamento"] },
@@ -126,7 +122,29 @@ const CATALOGO_MATERIAIS_PROCISA_AX = [
     { item: "2.2.1", desc: "FIBERLOOP DE NYLON G 66", codAx: "00009032", un: "UNIT", valor: 41.15, classes: ["Lançamento"] },
     { item: "2.3.2", desc: "SUPORTE TAP BRACKET 1/4 - 3/16", codAx: "00009043", un: "UNIT", valor: 4.16, classes: ["Lançamento"] },
     { item: "2.1.7", desc: "PLACA SINAL. FIBRA OTICA CLARO", codAx: "00009031", un: "UNIT", valor: 2.08, classes: ["Lançamento"] },
-    { item: "2.1.2", desc: "PRENSA FIO P/FIO ESPINAR 3/16", codAx: "00009034", un: "UNIT", valor: 2.04, classes: ["Lançamento"] }
+    { item: "2.1.2", desc: "PRENSA FIO P/FIO ESPINAR 3/16", codAx: "00009034", un: "UNIT", valor: 2.04, classes: ["Lançamento"] },
+
+    // Materiais Exclusivos de FUSÃO (Planilha Atualizada)
+    { item: "F-01", desc: "FITA ISOLANTE 19MM", codAx: "1036", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-02", desc: "ÁLCOOL ISOPROPÍLICO | ISOPROPANOL 99,8% 500ML", codAx: "17", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-03", desc: "ESTOPA PACOTE, COM 200 GR DE 1ª BRANCA", codAx: "73", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-04", desc: "MANTA DERIVACAO FOSC100 BM B8 S ZIPER CJ", codAx: "6180-BM", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-05", desc: "MANTA DERIVACAO FOSC100 DM B8 S ZIPER CJ", codAx: "6180-DM", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-06", desc: "PROTETOR DE EMENDA 60MM", codAx: "96", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-07", desc: "PROTETOR DE EMENDA 45MM", codAx: "95", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-08", desc: "VASELINA SÓLIDA - POTE 400G", codAx: "2603", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-09", desc: "ABRAÇADEIRA DE NYLON 4,8X400MM", codAx: "S/C", un: "UNIT", valor: 0, classes: ["Fusão"] },
+    { item: "F-10", desc: "ISOPARAFINA 500ML", codAx: "85", un: "UNIT", valor: 0, classes: ["Fusão"] }
+];
+
+// ================= PERFIS DE ACESSO GESTOR (MASTER ÚNICO + 5 INTERNOS) =================
+const USUARIOS_PADRAO_5G = [
+    { id: 1, nome: "Diogo Sávio Canongia Furtado", email: "diogo.savio@procisa.com.br", senha: "Procisa5G@", cargo: "COORDENADOR / MASTER", nivel: "Master", status: "Ativo" },
+    { id: 2, nome: "Alexandre Navega De Lima", email: "anlima@procisa.com.br", senha: "150026", cargo: "FISCAL DE OPERACOES", nivel: "Interno", status: "Ativo" },
+    { id: 3, nome: "Aline Gabriele de Assis Queiroz", email: "aqueiros@procisa.com.br", senha: "150193", cargo: "CP DOCUMENTACAO", nivel: "Interno", status: "Ativo" },
+    { id: 4, nome: "Paula Souto Cruz", email: "ps.cruz@procisa.com.br", senha: "150349", cargo: "CP CONSTRUCAO", nivel: "Interno", status: "Ativo" },
+    { id: 5, nome: "Bruna Mendes Do Nascimento", email: "b.nascimento@procisa.com.br", senha: "151087", cargo: "ATENDENTE", nivel: "Interno", status: "Ativo" },
+    { id: 6, nome: "Leticia Menezes Miziara De Medeiros", email: "l.medeiros1@procisa.com.br", senha: "153747", cargo: "AUXILIAR ADMINISTRATIVO", nivel: "Interno", status: "Ativo" }
 ];
 
 const cacheFotosSobDemanda = new Map();
@@ -134,74 +152,18 @@ let canalRealtimeGpd = null;
 let statusConexaoRealtime = "CONECTANDO";
 let timerDebounceRealtime = null;
 
-function atualizarIndicadorVisualRealtime(estado) {
-    statusConexaoRealtime = estado;
-    const lblSync = document.getElementById('lbl-status-autosync');
-    const badgeModoLeve = document.getElementById('badge-modo-leve-4g');
-    const horaAgora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    if (lblSync) {
-        lblSync.className = estado === 'ONLINE'
-            ? "text-[10px] bg-emerald-950 text-emerald-300 px-2.5 py-1.5 rounded-lg border border-emerald-600 font-mono flex items-center gap-1.5 shadow-sm"
-            : "text-[10px] bg-amber-950 text-amber-300 px-2.5 py-1.5 rounded-lg border border-amber-600 font-mono flex items-center gap-1.5";
-        lblSync.innerHTML = `<span class="w-2 h-2 rounded-full ${estado === 'ONLINE' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-pulse'} inline-block"></span> <b>AO VIVO (5G Real-Time):</b> <span id="txt-hora-sync" class="text-white">${horaAgora}</span>`;
-    }
-    if (badgeModoLeve) badgeModoLeve.innerText = estado === 'ONLINE' ? "🟢 Ao Vivo 5G" : "⚡ 4G/5G Leve";
-}
-
-function iniciarEscutaRealtimeSupabase() {
-    try {
-        if (canalRealtimeGpd) return;
-        canalRealtimeGpd = supabaseClient
-            .channel('gpd-5g-procisa-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'registros_producao' }, (payload) => {
-                tratarEventoRealtimeRecebido(payload);
-            })
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') atualizarIndicadorVisualRealtime('ONLINE');
-                else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') atualizarIndicadorVisualRealtime('RECONECTANDO');
-            });
-    } catch (e) {}
-}
-
-async function tratarEventoRealtimeRecebido(payload) {
-    try {
-        const tipo = payload.eventType;
-        if (tipo === 'DELETE' && payload.old?.id) {
-            registrosSalvos = (registrosSalvos || []).filter(r => r.id !== Number(payload.old.id));
-        } else if ((tipo === 'INSERT' || tipo === 'UPDATE') && payload.new?.id) {
-            await processarPacoteDadosNuvem([payload.new], false, false);
-        }
-        atualizarIndicadorVisualRealtime('ONLINE');
-        if (timerDebounceRealtime) clearTimeout(timerDebounceRealtime);
-        timerDebounceRealtime = setTimeout(() => {
-            if (!document.getElementById('view-gestor')?.classList.contains('hidden') && usuarioLogado && typeof atualizarDashboardGestor === "function") {
-                atualizarDashboardGestor();
-            }
-        }, 350);
-    } catch (e) {}
-}
-
 function lerJsonSeguroLocal(chave, valorPadrao) {
-    try {
-        const b = localStorage.getItem(chave);
-        return b ? JSON.parse(b) : valorPadrao;
-    } catch (e) { return valorPadrao; }
+    try { const b = localStorage.getItem(chave); return b ? JSON.parse(b) : valorPadrao; } catch (e) { return valorPadrao; }
 }
 
-const CATALOGO_PROJETOS_PADRAO = [
+let PARCEIROS_SISTEMA = lerJsonSeguroLocal('gpd5g_parceiros', JSON.parse(JSON.stringify(CATALOGO_PARCEIROS_PADRAO)));
+let FISCAIS_SISTEMA = JSON.parse(JSON.stringify(CATALOGO_FISCAIS_PADRAO));
+const CATALOGO_PROJETOS_SISTEMA = [
     { nome: "LANÇAMENTO 5G", grupo: "NODEB 5G", setor: "Lançamento" },
     { nome: "FUSÃO 5G", grupo: "NODEB 5G", setor: "Fusão" },
     { nome: "OBRA CIVIL / SUBTERRÂNEA 5G", grupo: "NODEB 5G", setor: "Obra" }
 ];
-
-let PARCEIROS_SISTEMA = lerJsonSeguroLocal('gpd5g_parceiros', JSON.parse(JSON.stringify(CATALOGO_PARCEIROS_PADRAO)));
-let FISCAIS_SISTEMA = JSON.parse(JSON.stringify(CATALOGO_FISCAIS_PADRAO));
-let CATALOGO_PROJETOS_SISTEMA = JSON.parse(JSON.stringify(CATALOGO_PROJETOS_PADRAO));
-let PROJETOS_POR_SETOR = {
-    "Lançamento": ["LANÇAMENTO 5G"],
-    "Fusão": ["FUSÃO 5G"],
-    "Obra": ["OBRA CIVIL / SUBTERRÂNEA 5G"]
-};
+let PROJETOS_POR_SETOR = { "Lançamento": ["LANÇAMENTO 5G"], "Fusão": ["FUSÃO 5G"], "Obra": ["OBRA CIVIL / SUBTERRÂNEA 5G"] };
 let TODOS_OS_PROJETOS = ["LANÇAMENTO 5G", "FUSÃO 5G", "OBRA CIVIL / SUBTERRÂNEA 5G"];
 
 let OPCOES_COMBUSTIVEL_PADRAO = ["ROTA LONGA ENTRE SITES / ANEL", "SALDO DO CARTÃO INSUFICIENTE", "APOIO A OUTRA EQUIPE 5G", "ATENDIMENTO EM OUTRO MUNICÍPIO", "EMERGÊNCIA"];
@@ -213,27 +175,97 @@ let OPCOES_MATERIAL_SOLICITACAO = [
     "[LANÇAMENTO - AX 00009032] FIBERLOOP DE NYLON G 66 (UNIT)",
     "[LANÇAMENTO - AX 00009031] PLACA SINAL. FIBRA OTICA CLARO (UNIT)",
     "[FUSÃO - SAP 22068144] CAIXA EMENDA FOSC100 B8 72F 8 SAIDAS (UNIT)",
-    "[FUSÃO - SAP 22007782] DGO 19PG P/BAST 72FBR SC/APC (UNIT)"
+    "[FUSÃO - SAP 22007782] DGO 19PG P/BAST 72FBR SC/APC (UNIT)",
+    "[FUSÃO - CÓD 1036] FITA ISOLANTE 19MM (UNIT)",
+    "[FUSÃO - CÓD 17] ÁLCOOL ISOPROPÍLICO 99,8% 500ML (UNIT)",
+    "[FUSÃO - CÓD 73] ESTOPA PACOTE 200GR BRANCA (UNIT)",
+    "[FUSÃO - CÓD 6180] MANTA DERIVACAO FOSC100 BM B8 S ZIPER CJ (UNIT)",
+    "[FUSÃO - CÓD 6180] MANTA DERIVACAO FOSC100 DM B8 S ZIPER CJ (UNIT)",
+    "[FUSÃO - CÓD 96] PROTETOR DE EMENDA 60MM (UNIT)",
+    "[FUSÃO - CÓD 95] PROTETOR DE EMENDA 45MM (UNIT)",
+    "[FUSÃO - CÓD 2603] VASELINA SÓLIDA POTE 400G (UNIT)",
+    "[FUSÃO - S/C] ABRAÇADEIRA DE NYLON 4,8X400MM (UNIT)",
+    "[FUSÃO - CÓD 85] ISOPARAFINA 500ML (UNIT)"
 ];
 let OPCOES_IMPREVISTO_PADRAO = ["VEÍCULO COM DEFEITO", "AGUARDANDO MATERIAL", "MÁQUINA DE FUSÃO EM MANUTENÇÃO", "CHUVA FORTE / INTEMPÉRIE", "ÁREA DE RISCO / BLOQUEIO", "AGUARDANDO LIBERAÇÃO DO FISCAL"];
 
-let equipesSistema = lerJsonSeguroLocal('gpd5g_equipes_cadastradas', JSON.parse(JSON.stringify(BASE_EQUIPES_PROCISA_5G)));
+let equipesSistema = lerJsonSeguroLocal('gpd5g_equipes_cadastradas', JSON.parse(JSON.stringify(BASE_CABECAS_EQUIPE_5G)));
 let telemetriaEquipes = lerJsonSeguroLocal('gpd5g_telemetria_equipes', {});
-let dadosAtendimento = { idEmAndamento: null, hEntrada: null, gpsEntrada: null, empresaSelecionada: "PROCISA", idSite: "", anel: "", fiscalResponsavel: "DIEGO ALVES JARDIM DOS SANTOS", blocos: [] };
+let dadosAtendimento = { idEmAndamento: null, hEntrada: null, gpsEntrada: null, empresaSelecionada: "PROCISA", idSite: "", anel: "", fiscalResponsavel: "DIEGO ALVES", blocos: [] };
 let registrosSalvos = [];
-let usuariosSistema = lerJsonSeguroLocal('gpd5g_usuarios_cadastrados', [
-    { id: 1, nome: "Diogo Sávio Canongia Furtado", email: "diogo.savio@procisa.com.br", senha: "Procisa5G@", nivel: "Master", status: "Ativo" },
-    { id: 2, nome: "Leonardo Simões de Almeida", email: "lsimoes@procisa.com.br", senha: "Leo290301@", nivel: "Master", status: "Ativo" }
-]);
-let trilhaAuditoria = lerJsonSeguroLocal('gpd5g_trilha_auditoria', []);
+let usuariosSistema = JSON.parse(JSON.stringify(USUARIOS_PADRAO_5G));
 let usuarioLogado = sessionStorage.getItem('gpd5g_user_logado') || null;
-let nivelUsuarioLogado = "Master";
+let usuarioObjetoLogado = null;
+let nivelUsuarioLogado = "Interno";
 let equipeAutenticadaSessao = sessionStorage.getItem('gpd5g_equipe_autenticada_pin') || "";
 let dadosFiltradosAtuais = [];
 let listaImprevistosAtuais = [];
 let listaSolicitacoesCombustivelAtuais = [];
 let listaSolicitacoesMaterialAtuais = [];
 let ultimoResumoCampoTexto = "";
+
+// ================= REGRAS DE PERMISSÃO E FILTRO DE CABEÇAS DE EQUIPE =================
+function usuarioEhMaster() {
+    return String(usuarioLogado || "").toLowerCase().trim() === EMAIL_MASTER_UNICO;
+}
+
+function usuarioBloqueadoFinanceiro() {
+    if (usuarioEhMaster()) return false;
+    const cargo = String(usuarioObjetoLogado?.cargo || "").toUpperCase();
+    // Libera APENAS para CP DOCUMENTACAO (Aline) e CP CONSTRUCAO (Paula); bloqueia os demais internos
+    return !(cargo.includes("CP DOCUMENTACAO") || cargo.includes("CP CONSTRUCAO"));
+}
+
+function exibirAvisoSomenteMaster(acao = "realizar esta ação") {
+    alert(`🔒 ACESSO RESTRITO!\n\nSomente a conta Master (${EMAIL_MASTER_UNICO}) tem permissão para ${acao}.`);
+}
+
+function ehCabecaDeEquipe(eq) {
+    if (!eq) return false;
+    const f = String(eq.funcao || "").toUpperCase();
+    if (f.includes("OFICIAL DE REDE") || f.includes("AJ DE FIBRA") || f.includes("AJUDANTE") || f.includes("APRENDIZ")) return false;
+    return true;
+}
+
+function atualizarIndicadorVisualRealtime(estado) {
+    statusConexaoRealtime = estado;
+    const lblSync = document.getElementById('lbl-status-autosync');
+    const badge = document.getElementById('badge-modo-leve-4g');
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (lblSync) {
+        lblSync.className = estado === 'ONLINE'
+            ? "text-[10px] bg-emerald-950 text-emerald-300 px-2.5 py-1.5 rounded-lg border border-emerald-600 font-mono flex items-center gap-1.5 shadow-sm"
+            : "text-[10px] bg-amber-950 text-amber-300 px-2.5 py-1.5 rounded-lg border border-amber-600 font-mono flex items-center gap-1.5";
+        lblSync.innerHTML = `<span class="w-2 h-2 rounded-full ${estado === 'ONLINE' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 animate-pulse'} inline-block"></span> <b>AO VIVO (5G Real-Time):</b> <span id="txt-hora-sync" class="text-white">${hora}</span>`;
+    }
+    if (badge) badge.innerText = estado === 'ONLINE' ? "🟢 Ao Vivo 5G" : "⚡ 4G/5G Leve";
+}
+
+function iniciarEscutaRealtimeSupabase() {
+    try {
+        if (canalRealtimeGpd) return;
+        canalRealtimeGpd = supabaseClient
+            .channel('gpd-5g-procisa-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'registros_producao' }, (payload) => {
+                if (payload.eventType === 'DELETE' && payload.old?.id) {
+                    registrosSalvos = (registrosSalvos || []).filter(r => r.id !== Number(payload.old.id));
+                } else if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new?.id) {
+                    processarPacoteDadosNuvem([payload.new], false, false);
+                }
+                atualizarIndicadorVisualRealtime('ONLINE');
+                if (timerDebounceRealtime) clearTimeout(timerDebounceRealtime);
+                timerDebounceRealtime = setTimeout(() => {
+                    if (!document.getElementById('view-gestor')?.classList.contains('hidden') && usuarioLogado && typeof atualizarDashboardGestor === "function") {
+                        atualizarDashboardGestor();
+                    }
+                }, 350);
+            })
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') atualizarIndicadorVisualRealtime('ONLINE');
+                else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') atualizarIndicadorVisualRealtime('RECONECTANDO');
+            });
+    } catch (e) {}
+}
 
 function normalizarSetor5G(str) {
     const s = String(str || "").toUpperCase();
@@ -319,13 +351,14 @@ function converterLinhaBancoParaObjetoGpd(r) {
 
     return {
         id: r.id, dataRegistro: r.data_registro || '', equipe: (r.equipe || '').toUpperCase().trim(),
-        empresa: emp, anel: anel || r.contato || '', fiscalResponsavel: fisc || r.responsavel || 'DIEGO ALVES JARDIM DOS SANTOS',
+        empresa: emp, anel: anel || r.contato || '', fiscalResponsavel: fisc || r.responsavel || 'DIEGO ALVES',
         projeto: normalizarNomeProjeto(r.projeto || ''), imovel: r.imovel || '', endereco: end,
         itens5g, tratadoPor, tratadoDataHora: tratadoEm,
         hEntrada: r.h_entrada || '', hSaida: r.h_saida || '', gpsEntrada: r.gps_entrada || '', gpsSaida: r.gps_saida || '',
         desfecho: r.desfecho || '', motivoDesfecho: r.motivo_desfecho || '', malogros: Array.isArray(r.malogros) ? r.malogros : [],
         andares: Number(r.andares) || 0, hps: Number(r.hps) || 0, observacoes: obs,
         caboRL: Number(r.cabo_rl) || 0, cxFosc: Number(r.cx_fosc) || 0, dio: Number(r.dio) || 0, fusoes: Number(r.fusoes) || 0,
+        fotos: cacheFotosSobDemanda.get(r.id) || [],
         qtdFotos: (cacheFotosSobDemanda.get(r.id) || []).length
     };
 }
@@ -402,15 +435,20 @@ function popularSelectProjetosGlobal() {
     if (sel) sel.innerHTML = `<option value="">🏗️ Todas as Classes 5G</option>` + CATALOGO_PROJETOS_SISTEMA.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
 }
 
+// SOMENTE CABEÇAS DE EQUIPE (SEM OFICIAL DE REDE / AJUDANTE DE FIBRA)
 function popularSelectEquipes() {
     const selCampo = document.getElementById('sel-equipe');
     const selFiltro = document.getElementById('gestor-filtro-equipe');
     const vAtual = selCampo ? selCampo.value : "";
-    if (selCampo) selCampo.innerHTML = '<option value="">Selecione a Equipe / Colaborador...</option>';
-    if (selFiltro) selFiltro.innerHTML = '<option value="">👥 Todas as Equipes</option>';
-    (equipesSistema || []).forEach(eq => {
-        if (!eq || !eq.nome) return;
-        const lbl = `${eq.numeroEquipe ? `[${eq.numeroEquipe}] ` : ''}${eq.nome} (${eq.empresa || 'PROCISA'} • ${eq.setor})`;
+    if (selCampo) selCampo.innerHTML = '<option value="">Selecione o Cabeça de Equipe...</option>';
+    if (selFiltro) selFiltro.innerHTML = '<option value="">👥 Todos os Cabeças de Equipe</option>';
+
+    const cabecas = (equipesSistema || []).filter(eq => eq && eq.nome && ehCabecaDeEquipe(eq));
+    cabecas.sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+
+    cabecas.forEach(eq => {
+        const icone = normalizarSetor5G(eq.setor) === 'Fusão' ? '🔵' : '🟠';
+        const lbl = `${icone} ${eq.numeroEquipe ? `[${eq.numeroEquipe}] ` : ''}${eq.nome} (${eq.empresa || 'PROCISA'} • ${eq.setor})`;
         if (eq.status === "Ativo" && selCampo) selCampo.innerHTML += `<option value="${eq.nome}">${lbl}</option>`;
         if (selFiltro) selFiltro.innerHTML += `<option value="${eq.nome}">${lbl}</option>`;
     });
@@ -431,27 +469,40 @@ function atualizarBarraSegurancaPinCampo() {
     }
 }
 
+function verificarPermissoesSessao() {
+    if (!usuarioLogado) { usuarioObjetoLogado = null; nivelUsuarioLogado = "Interno"; return; }
+    const u = usuariosSistema.find(x => x.email.toLowerCase() === usuarioLogado.toLowerCase());
+    usuarioObjetoLogado = u || { nome: usuarioLogado, email: usuarioLogado, cargo: "INTERNO", nivel: "Interno" };
+    nivelUsuarioLogado = usuarioEhMaster() ? "Master" : (usuarioObjetoLogado.cargo || "Interno");
+}
+
 async function tentarAcessarGestor() {
     if (usuarioLogado) { alternarVisao('gestor'); return; }
-    let email = prompt("🔒 E-mail corporativo (Ex: diogo.savio@procisa.com.br):")?.trim().toLowerCase();
+    let email = prompt("🔒 Digite seu e-mail corporativo (@procisa.com.br):")?.trim().toLowerCase();
     if (!email) return;
-    let senha = prompt("🔑 Senha de acesso:")?.trim();
+    let senha = prompt("🔑 Digite sua senha (Internos: sua matrícula):")?.trim();
     if (!senha) return;
-    if ((email === "diogo.savio@procisa.com.br" && senha === "Procisa5G@") || (email === "lsimoes@procisa.com.br" && senha === "Leo290301@") || usuariosSistema.some(u => u.email.toLowerCase() === email && u.senha === senha)) {
-        usuarioLogado = email;
+
+    const u = usuariosSistema.find(x => x.email.toLowerCase() === email && String(x.senha) === String(senha) && x.status === "Ativo");
+    if (u) {
+        usuarioLogado = u.email.toLowerCase();
         sessionStorage.setItem('gpd5g_user_logado', usuarioLogado);
+        verificarPermissoesSessao();
         document.getElementById('badge-usuario-logado')?.classList.remove('hidden');
         document.getElementById('btn-sair-gestor')?.classList.remove('hidden');
         document.getElementById('txt-email-ativo').innerText = usuarioLogado;
-        document.getElementById('txt-nivel-ativo').innerText = "Master";
+        document.getElementById('txt-nivel-ativo').innerText = nivelUsuarioLogado;
         await carregarRegistrosDaNuvem();
         alternarVisao('gestor');
-    } else alert("❌ Credenciais inválidas.");
+    } else {
+        alert("❌ E-mail ou senha incorretos.");
+    }
 }
 
 function fazerLogoutGestor() {
     sessionStorage.removeItem('gpd5g_user_logado');
     usuarioLogado = null;
+    usuarioObjetoLogado = null;
     document.getElementById('badge-usuario-logado')?.classList.add('hidden');
     document.getElementById('btn-sair-gestor')?.classList.add('hidden');
     alternarVisao('campo');
@@ -462,6 +513,7 @@ function alternarVisao(visao) {
     const bA = document.getElementById('header-gestor-acoes'), sB = document.getElementById('header-gestor-subbarra');
     if (visao === 'gestor') {
         if (!usuarioLogado) { tentarAcessarGestor(); return; }
+        verificarPermissoesSessao();
         vG?.classList.remove('hidden'); vC?.classList.add('hidden');
         bA?.classList.remove('hidden'); sB?.classList.remove('hidden');
         if (typeof atualizarDashboardGestor === "function") atualizarDashboardGestor();
@@ -475,6 +527,7 @@ function alternarVisao(visao) {
 
 window.onload = async function() {
     document.title = "GPD - Setor Construção 5G PROCISA RJ";
+    verificarPermissoesSessao();
     popularSelectProjetosGlobal();
     popularSelectEquipes();
     iniciarEscutaRealtimeSupabase();
@@ -484,7 +537,7 @@ window.onload = async function() {
         document.getElementById('badge-usuario-logado')?.classList.remove('hidden');
         document.getElementById('btn-sair-gestor')?.classList.remove('hidden');
         document.getElementById('txt-email-ativo').innerText = usuarioLogado;
-        document.getElementById('txt-nivel-ativo').innerText = "Master";
+        document.getElementById('txt-nivel-ativo').innerText = nivelUsuarioLogado;
         alternarVisao('gestor');
     } else {
         alternarVisao('campo');
