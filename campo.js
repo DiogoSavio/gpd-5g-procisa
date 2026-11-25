@@ -1,11 +1,10 @@
-// ================= CAMPO.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V5 - ALMOÇO NA ATIVIDADE & SEM ENDEREÇO MANUAL) =================
+// ================= CAMPO.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V6 - SINCRONISMO TOTAL & TRAVA 1H ALMOÇO) =================
 let salvandoAtendimentoTrava = false;
 let enviandoMaterialTrava = false;
 let enviandoCombustivelTrava = false;
 let fotosSolicCombustivelTemp = { saldo: null, painel: null };
 
 function inicializarCamposExtras5GCampo() {
-    // Oculta o campo de endereço manual (GPS já faz a localização)
     const inpEnd = document.getElementById('form-endereco');
     if (inpEnd && inpEnd.parentNode) inpEnd.parentNode.classList.add('hidden');
 
@@ -186,53 +185,96 @@ function comprimirImagemBase64Campo(arquivo, larguraMaxima = 720, qualidade = 0.
     });
 }
 
+// ================= INICIAR EXPEDIENTE (CRIA REGISTRO "EQUIPE DISPONÍVEL" SINCRONIZADO) =================
 async function iniciarExpedienteRastreioCampo() {
     const nomeEq = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     if (!nomeEq) return;
     const coord = await capturarGpsReal();
     const [lat, lng] = coord.split(',').map(s => parseFloat(s.trim()));
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const hoje = obterDataLocalISO();
+    const eqObj = (equipesSistema || []).find(e => e.nome === nomeEq);
+    const emp = eqObj?.empresa || "PROCISA";
+    const fisc = dadosAtendimento.ehFiscal ? "DIOGO SAVIO" : (eqObj?.fiscal || "DIOGO SAVIO");
+    const proj = dadosAtendimento.ehFiscal ? "FISCALIZAÇÃO LANÇAMENTO" : (normalizarSetor5G(eqObj?.setor) === 'Fusão' ? 'FUSÃO 5G' : 'LANÇAMENTO 5G');
+
     await sincronizarTelemetriaNaNuvem(nomeEq, {
-        equipe: nomeEq, data: obterDataLocalISO(), statusTurno: 'DISPONIVEL',
-        horaInicio: hora, horaFim: null, lat, lng, horaUltimoSinal: hora
+        equipe: nomeEq, data: hoje, statusTurno: 'DISPONIVEL',
+        horaInicio: hora, horaFim: null, lat, lng, horaUltimoSinal: hora,
+        emAlmoco: false, almocoInicio: null, almocoFim: null, almocoInicioTs: null
     });
-    document.getElementById('lbl-status-expediente-campo').innerText = "🟢 Expediente Ativo (Em Rota)";
+
+    // Registra linha "EQUIPE DISPONÍVEL" em Sites/Atividades se não houver atividade aberta hoje
+    const jaExisteDisp = (registrosSalvos || []).find(r => r.dataRegistro === hoje && r.equipe === nomeEq && (r.desfecho === 'EQUIPE DISPONÍVEL' || r.desfecho === 'EM ANDAMENTO'));
+    if (!jaExisteDisp) {
+        await supabaseClient.from('registros_producao').insert([{
+            id: Date.now(), data_registro: hoje, equipe: nomeEq, membros: nomeEq, projeto: proj,
+            imovel: "DISPONÍVEL SEM ATIVIDADE", h_entrada: hora, h_saida: "Aguardando Site",
+            gps_entrada: coord, gps_saida: "-", desfecho: "EQUIPE DISPONÍVEL",
+            motivo_desfecho: "Expediente iniciado (sem site aberto)", malogros: [],
+            responsavel: fisc, contato: "-", email: emp,
+            observacoes: `[EMPRESA: ${emp}] [FISCAL: ${fisc}] Expediente iniciado`
+        }]);
+    }
+
+    document.getElementById('lbl-status-expediente-campo').innerText = "🟢 Expediente Ativo (Online)";
     document.getElementById('lbl-hora-inicio-expediente').innerText = `Início: ${hora}`;
     document.getElementById('btn-iniciar-expediente-campo')?.classList.add('hidden');
     document.getElementById('btn-encerrar-expediente-campo')?.classList.remove('hidden');
-    alert(`🟢 Expediente iniciado às ${hora}!`);
+    alert(`🟢 Expediente iniciado às ${hora}! Você já aparece Online no Console, no Mapa e em Sites/Atividades.`);
 }
 
 async function encerrarExpedienteRastreioCampo() {
     const nomeEq = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     if (!nomeEq) return;
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    await sincronizarTelemetriaNaNuvem(nomeEq, { ...(telemetriaEquipes[nomeEq] || {}), equipe: nomeEq, data: obterDataLocalISO(), statusTurno: 'ENCERRADO', horaFim: hora });
+    await sincronizarTelemetriaNaNuvem(nomeEq, { ...(telemetriaEquipes[nomeEq] || {}), equipe: nomeEq, data: obterDataLocalISO(), statusTurno: 'ENCERRADO', horaFim: hora, emAlmoco: false });
     document.getElementById('lbl-status-expediente-campo').innerText = "🔴 Expediente Encerrado";
     document.getElementById('btn-iniciar-expediente-campo')?.classList.remove('hidden');
     document.getElementById('btn-encerrar-expediente-campo')?.classList.add('hidden');
 }
 
-// ================= INICIAR E CONCLUIR ALMOÇO DENTRO DA ATIVIDADE EM ANDAMENTO =================
+// ================= ALMOÇO COM TRAVA OBRIGATÓRIA DE 1 HORA (60 MINUTOS) =================
 async function iniciarAlmocoNaAtividade() {
     const equipe = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     if (!equipe) return;
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const agoraTs = Date.now();
     dadosAtendimento.emAlmoco = true;
     dadosAtendimento.almocoInicio = hora;
+    dadosAtendimento.almocoInicioTs = agoraTs;
     dadosAtendimento.almocoFim = null;
 
     await sincronizarTelemetriaNaNuvem(equipe, {
         ...(telemetriaEquipes[equipe] || {}), equipe, data: obterDataLocalISO(),
-        almocoInicio: hora, almocoFim: null, emAlmoco: true
+        almocoInicio: hora, almocoFim: null, almocoInicioTs: agoraTs, emAlmoco: true
     });
+
+    // Atualiza o registro da atividade em andamento para mostrar "EM ALMOÇO" em Sites/Atividades
+    if (dadosAtendimento.idEmAndamento) {
+        await supabaseClient.from('registros_producao').update({
+            desfecho: "EM ALMOÇO",
+            h_saida: `Almoço desde ${hora}`
+        }).eq('id', dadosAtendimento.idEmAndamento);
+    }
+
     atualizarBotaoAlmocoNaAtividade();
-    alert(`🍽️ Almoço iniciado às ${hora}! Sua atividade segue em andamento e o bloco fúcsia já aparece no Console.`);
+    alert(`🍽️ Almoço iniciado às ${hora}!\n\nA conclusão só será liberada após 1 hora completa de descanso (60 minutos).`);
 }
 
 async function concluirAlmocoNaAtividade() {
     const equipe = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     if (!equipe) return;
+
+    // Verificação rigorosa de 60 minutos (1 hora)
+    const inicioTs = dadosAtendimento.almocoInicioTs || telemetriaEquipes[equipe]?.almocoInicioTs || 0;
+    const minutosDecorridos = (Date.now() - inicioTs) / 60000;
+    if (inicioTs > 0 && minutosDecorridos < 60) {
+        const restantes = Math.ceil(60 - minutosDecorridos);
+        alert(`⏳ DESCANSO OBRIGATÓRIO DE 1 HORA!\n\nAinda faltam ${restantes} minuto(s) para completar 1h de almoço. Aguarde o término para retomar a atividade.`);
+        return;
+    }
+
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     dadosAtendimento.emAlmoco = false;
     dadosAtendimento.almocoFim = hora;
@@ -241,6 +283,15 @@ async function concluirAlmocoNaAtividade() {
         ...(telemetriaEquipes[equipe] || {}), equipe, data: obterDataLocalISO(),
         almocoInicio: dadosAtendimento.almocoInicio, almocoFim: hora, emAlmoco: false
     });
+
+    // Retoma automaticamente a atividade para EM ANDAMENTO em Sites/Atividades
+    if (dadosAtendimento.idEmAndamento) {
+        await supabaseClient.from('registros_producao').update({
+            desfecho: "EM ANDAMENTO",
+            h_saida: "Em Andamento"
+        }).eq('id', dadosAtendimento.idEmAndamento);
+    }
+
     atualizarBotaoAlmocoNaAtividade();
     alert(`✅ Almoço concluído às ${hora}! Atividade retomada automaticamente.`);
 }
@@ -255,15 +306,15 @@ function atualizarBotaoAlmocoNaAtividade() {
         </div>`;
     } else if (dadosAtendimento.almocoFim) {
         box.innerHTML = `<div class="bg-fuchsia-50 border border-fuchsia-300 p-2 rounded-xl flex justify-between items-center text-[11px] font-bold text-fuchsia-900">
-            <span>🍽️ Almoço registrado: ${dadosAtendimento.almocoInicio} às ${dadosAtendimento.almocoFim}</span>
+            <span>🍽️ Almoço: ${dadosAtendimento.almocoInicio} às ${dadosAtendimento.almocoFim}</span>
             <span class="text-emerald-700">✅ Retomado</span>
         </div>`;
     } else {
-        box.innerHTML = `<button type="button" onclick="iniciarAlmocoNaAtividade()" class="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-black py-2 rounded-xl shadow-sm">🍽️ Iniciar Almoço (Pausa na Atividade)</button>`;
+        box.innerHTML = `<button type="button" onclick="iniciarAlmocoNaAtividade()" class="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-black py-2 rounded-xl shadow-sm">🍽️ Iniciar Almoço (Pausa 1h na Atividade)</button>`;
     }
 }
 
-// ================= CHECK-IN NO SITE =================
+// ================= CHECK-IN NO SITE (SUBSTITUI LINHA "EQUIPE DISPONÍVEL" PELA ATIVIDADE REAL) =================
 async function fazerCheckIn() {
     const equipe = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     const projeto = document.getElementById('sel-projeto')?.value;
@@ -280,14 +331,17 @@ async function fazerCheckIn() {
     const [lat, lng] = coordReal.split(',').map(s => parseFloat(s.trim()));
     const horaEntrada = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const hojeISO = obterDataLocalISO();
-    const idTemp = Date.now();
+
+    // Remove linha "EQUIPE DISPONÍVEL" de hoje para não duplicar em Sites/Atividades
+    const regDisp = (registrosSalvos || []).find(r => r.dataRegistro === hojeISO && r.equipe === equipe && r.desfecho === 'EQUIPE DISPONÍVEL');
+    const idTemp = regDisp ? regDisp.id : Date.now();
 
     await sincronizarTelemetriaNaNuvem(equipe, {
         ...(telemetriaEquipes[equipe] || {}), equipe, data: hojeISO, statusTurno: 'DISPONIVEL',
         horaInicio: telemetriaEquipes[equipe]?.horaInicio || horaEntrada, lat, lng, horaUltimoSinal: horaEntrada
     });
 
-    dadosAtendimento = { ...dadosAtendimento, idEmAndamento: idTemp, hEntrada: horaEntrada, gpsEntrada: coordReal, idSite, anel, fiscalResponsavel: fiscal, empresaSelecionada: empresa, emAlmoco: false, almocoInicio: null, almocoFim: null };
+    dadosAtendimento = { ...dadosAtendimento, idEmAndamento: idTemp, hEntrada: horaEntrada, gpsEntrada: coordReal, idSite, anel, fiscalResponsavel: fiscal, empresaSelecionada: empresa, emAlmoco: false, almocoInicio: null, almocoFim: null, almocoInicioTs: null };
 
     const tagEqFisc = ehFiscal ? `[EQ_FISCALIZADA: ${dadosAtendimento.equipeFiscalizada}] ` : "";
     await supabaseClient.from('registros_producao').upsert([{
@@ -418,7 +472,7 @@ async function cancelarCheckinAberto(apenasLimpar = false) {
     document.getElementById('inp-imovel').value = "";
 }
 
-// ================= COMBUSTÍVEL (2 FOTOS + TRAVA ANTI-DUPLICAÇÃO) =================
+// ================= COMBUSTÍVEL, MATERIAL E IMPREVISTO =================
 function abrirModalSolicitacaoCombustivelCampo() {
     if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe/Fiscal primeiro."); return; }
     fotosSolicCombustivelTemp = { saldo: null, painel: null };
@@ -495,7 +549,6 @@ async function enviarSolicitacaoCombustivelCampo() {
     finally { enviandoCombustivelTrava = false; if (btn) { btn.disabled = false; btn.innerText = "🚀 Enviar Solicitação"; } }
 }
 
-// ================= SOLICITAÇÃO DE MATERIAL (COM CÓDIGOS OFICIAIS + SITE) =================
 function abrirModalSolicitacaoMaterialCampo() {
     if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe/Fiscal primeiro."); return; }
     const m = document.getElementById('modal-solic-material');
