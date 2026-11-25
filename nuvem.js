@@ -1,4 +1,4 @@
-// ================= NUVEM.JS - SETOR CONSTRUÇÃO 5G • PROCISA RJ (V3) =================
+// ================= NUVEM.JS - SETOR CONSTRUÇÃO 5G • PROCISA RJ (V4) =================
 const SUPABASE_URL = "https://ceehwsoitppskjipcqqs.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_4IThgbQyoR36PE6le5P9rQ_DYckrEXS";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -12,7 +12,7 @@ const ID_NUVEM_AUDITORIA = 999999005;
 const PROJETO_SOLIC_COMBUSTIVEL = "__SOLIC_COMBUSTIVEL__";
 const PROJETO_SOLIC_MATERIAL    = "__SOLIC_MATERIAL__";
 const EMAIL_MASTER_UNICO        = "diogo.savio@procisa.com.br";
-const ORDEM_SETORES             = ["Lançamento", "Fusão", "Obra"];
+const ORDEM_SETORES             = ["Lançamento", "Fusão", "Obra", "Fiscal"];
 let cargaInicialGestorConcluida = false;
 
 // ================= CATÁLOGO DE PARCEIROS E FISCAIS =================
@@ -28,17 +28,15 @@ const CATALOGO_PARCEIROS_PADRAO = [
 ];
 
 const CATALOGO_FISCAIS_PADRAO = [
-    { nome: "DIEGO ALVES", regiao: "ZONA OESTE", matricula: "150076" },
-    { nome: "FABIO BARBOSA", regiao: "ZONA NORTE/BAIXADA", matricula: "150079" },
-    { nome: "ADEMIR MUNIZ", regiao: "ZONA SUL/NITERÓI", matricula: "150403" },
-    { nome: "SILMAR LEITE", regiao: "VIAGEM", matricula: "150024" },
-    { nome: "FABIO MANUEL DA SILVA", regiao: "BAIXADA", matricula: "150299" },
-    { nome: "ALEXANDRE NAVEGA DE LIMA", regiao: "INTERNO", matricula: "150026" }
+    { nome: "DIEGO ALVES", nomeCompleto: "DIEGO ALVES JARDIM DOS SANTOS", regiao: "ZONA OESTE", matricula: "150076", email: "d.santos5@procisa.com.br" },
+    { nome: "FABIO BARBOSA", nomeCompleto: "FABIO SANTOS DE MELLO BARBOSA", regiao: "ZONA NORTE/BAIXADA", matricula: "150079", email: "fabio.m.barbosa1989@gmail.com" },
+    { nome: "ADEMIR MUNIZ", nomeCompleto: "ADEMIR DA COSTA MUNIZ", regiao: "ZONA SUL/NITERÓI", matricula: "150403", email: "a.muniz1@procisa.com.br" },
+    { nome: "SILMAR LEITE", nomeCompleto: "SILMAR LEITE RIBEIRO", regiao: "VIAGEM", matricula: "150024", email: "s.leiteribei@procisa.com.br" },
+    { nome: "FABIO MANUEL DA SILVA", nomeCompleto: "FABIO MANUEL DA SILVA", regiao: "BAIXADA", matricula: "150299", email: "f.silva11@procisa.com.br" }
 ];
 
 // ================= 24 CABEÇAS DE EQUIPE OFICIAIS (12 LANÇAMENTO + 12 FUSÃO) =================
 const BASE_CABECAS_EQUIPE_5G = [
-    // --- LANÇAMENTO (12 EQUIPES - LARANJA) ---
     { id: 1001, numeroEquipe: "L-01", matricula: "150472", nome: "NICKSON WILLIAM VIANNA DOS SANTOS", rg: "23.143.385-5", cpf: "142.281.637-00", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
     { id: 1002, numeroEquipe: "L-02", matricula: "150074", nome: "HONOFRE ALUISIO CEZARIO", rg: "11.833.674-2", cpf: "078.003.067-20", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "ADEMIR MUNIZ", areaAtuacao: "ZONA SUL/NITERÓI", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
     { id: 1003, numeroEquipe: "L-03", matricula: "150061", nome: "ANDRE LUIS BORGES DE LIMA", rg: "10.367.152-5", cpf: "044.304.557-75", empresa: "PROCISA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
@@ -51,8 +49,6 @@ const BASE_CABECAS_EQUIPE_5G = [
     { id: 1010, numeroEquipe: "L-10", matricula: "", nome: "RODRIGO PESSOA PEREIRA", rg: "20.529.008-3", cpf: "114.530.177-04", empresa: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
     { id: 1011, numeroEquipe: "L-11", matricula: "", nome: "ADILSON ADRIANO FERREIRA", rg: "12.007.906-6", cpf: "053.867.117-33", empresa: "CRT SERVIÇOS DE TELECOMUNICAÇÕES LTDA", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "SILMAR LEITE", areaAtuacao: "VIAGEM", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
     { id: 1012, numeroEquipe: "L-12", matricula: "", nome: "MAICON JORGE DE SÁ DA SILVA", rg: "25.603.811-8", cpf: "155.079.357-85", empresa: "RVS SOLUÇÕES", funcao: "LIDER DE EQUIPE", setor: "Lançamento", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
-
-    // --- FUSÃO (12 EQUIPES - AZUL) ---
     { id: 2001, numeroEquipe: "F-01", matricula: "153507", nome: "JONATAS DA VEIGA ALMEIDA", rg: "21.247.926-5", cpf: "120.221.577-70", empresa: "PROCISA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "DIEGO ALVES", areaAtuacao: "ZONA OESTE", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
     { id: 2002, numeroEquipe: "F-02", matricula: "150251", nome: "MARLON RANGEL ACIOLI", rg: "24.829.110-6", cpf: "152.929.367-74", empresa: "PROCISA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
     { id: 2003, numeroEquipe: "F-03", matricula: "150273", nome: "DOUGLAS REIS DA SILVA", rg: "28.952.310-2", cpf: "162.891.647-83", empresa: "PROCISA", funcao: "TEC FIBRA OPTICA", setor: "Fusão", fiscal: "FABIO BARBOSA", areaAtuacao: "ZONA NORTE/BAIXADA", veiculo: "", celular: "", status: "Ativo", pin: "1234", ehCabeca: true },
@@ -99,10 +95,12 @@ const CATALOGO_MAO_DE_OBRA_5G = {
         { codigo: "7.52", itemV: "-", desc: "RECOMPOSIÇÃO ASFALTICA", un: "M²", precoCliente: 508.92, precoParceiro: 305.35 },
         { codigo: "7.53", itemV: "-", desc: "RECOMPOSIÇÃO CALÇADAS (TODOS TIPOS)", un: "M²", precoCliente: 74.54, precoParceiro: 44.72 },
         { codigo: "7.83", itemV: "-", desc: "MANUTENÇÃO CAIXA SUBTERRÂNEA (LIMPEZA/ FIXAÇÃO/ DRENO)", un: "UNIT", precoCliente: 1355.89, precoParceiro: 813.53 }
-    ]
+    ],
+    "Fiscal": []
 };
 
 // ================= MATERIAIS SEPARADOS ESTRITAMENTE POR CLASSE =================
+// Nota: Os 3 itens abaixo (SAP) NÃO entram no cálculo financeiro de miscelâneas/ferragens
 const CATALOGO_MATERIAIS_CLIENTE_SAP = [
     { codSap: "22067771", desc: "CABO FO CFOA SM DD S 72FO RC", un: "MT", classes: ["Lançamento"] },
     { codSap: "22068144", desc: "CAIXA EMENDA FOSC100 B8 72F 8 SAIDAS CJ", un: "UNIT", classes: ["Fusão"] },
@@ -110,7 +108,6 @@ const CATALOGO_MATERIAIS_CLIENTE_SAP = [
 ];
 
 const CATALOGO_MATERIAIS_PROCISA_AX = [
-    // Materiais Exclusivos de LANÇAMENTO
     { item: "1.1.2", desc: "BAP 3-ABRAÇADEIRA AJUSTÁVEL PARA POSTE- Ø MENOR 270MM - Ø MAIOR 310MM", codAx: "00009027", un: "UNIT", valor: 10.23, classes: ["Lançamento"] },
     { item: "1.1.5", desc: "SUPORTE P/ ISOLADOR_RE VERT.", codAx: "00009202", un: "UNIT", valor: 11.14, classes: ["Lançamento"] },
     { item: "1.1.6", desc: "ISOLADOR PORCELANA 72 X 72", codAx: "00009210", un: "UNIT", valor: 4.59, classes: ["Lançamento"] },
@@ -123,8 +120,6 @@ const CATALOGO_MATERIAIS_PROCISA_AX = [
     { item: "2.3.2", desc: "SUPORTE TAP BRACKET 1/4 - 3/16", codAx: "00009043", un: "UNIT", valor: 4.16, classes: ["Lançamento"] },
     { item: "2.1.7", desc: "PLACA SINAL. FIBRA OTICA CLARO", codAx: "00009031", un: "UNIT", valor: 2.08, classes: ["Lançamento"] },
     { item: "2.1.2", desc: "PRENSA FIO P/FIO ESPINAR 3/16", codAx: "00009034", un: "UNIT", valor: 2.04, classes: ["Lançamento"] },
-
-    // Materiais Exclusivos de FUSÃO (Planilha Atualizada)
     { item: "F-01", desc: "FITA ISOLANTE 19MM", codAx: "1036", un: "UNIT", valor: 0, classes: ["Fusão"] },
     { item: "F-02", desc: "ÁLCOOL ISOPROPÍLICO | ISOPROPANOL 99,8% 500ML", codAx: "17", un: "UNIT", valor: 0, classes: ["Fusão"] },
     { item: "F-03", desc: "ESTOPA PACOTE, COM 200 GR DE 1ª BRANCA", codAx: "73", un: "UNIT", valor: 0, classes: ["Fusão"] },
@@ -137,14 +132,20 @@ const CATALOGO_MATERIAIS_PROCISA_AX = [
     { item: "F-10", desc: "ISOPARAFINA 500ML", codAx: "85", un: "UNIT", valor: 0, classes: ["Fusão"] }
 ];
 
-// ================= PERFIS DE ACESSO GESTOR (MASTER ÚNICO + 5 INTERNOS) =================
+// ================= PERFIS DE ACESSO GESTOR (MASTER + 5 INTERNOS + 5 FISCAIS) =================
 const USUARIOS_PADRAO_5G = [
-    { id: 1, nome: "Diogo Sávio Canongia Furtado", email: "diogo.savio@procisa.com.br", senha: "Procisa5G@", cargo: "COORDENADOR / MASTER", nivel: "Master", status: "Ativo" },
-    { id: 2, nome: "Alexandre Navega De Lima", email: "anlima@procisa.com.br", senha: "150026", cargo: "FISCAL DE OPERACOES", nivel: "Interno", status: "Ativo" },
+    { id: 1, nome: "Diogo Sávio Canongia Furtado", email: "diogo.savio@procisa.com.br", senha: "Procisa5G@", cargo: "MASTER", nivel: "Master", status: "Ativo" },
+    { id: 2, nome: "Alexandre Navega De Lima", email: "anlima@procisa.com.br", senha: "150026", cargo: "FISCAL DE OPERACOES INTERNO", nivel: "Interno", status: "Ativo" },
     { id: 3, nome: "Aline Gabriele de Assis Queiroz", email: "aqueiros@procisa.com.br", senha: "150193", cargo: "CP DOCUMENTACAO", nivel: "Interno", status: "Ativo" },
     { id: 4, nome: "Paula Souto Cruz", email: "ps.cruz@procisa.com.br", senha: "150349", cargo: "CP CONSTRUCAO", nivel: "Interno", status: "Ativo" },
     { id: 5, nome: "Bruna Mendes Do Nascimento", email: "b.nascimento@procisa.com.br", senha: "151087", cargo: "ATENDENTE", nivel: "Interno", status: "Ativo" },
-    { id: 6, nome: "Leticia Menezes Miziara De Medeiros", email: "l.medeiros1@procisa.com.br", senha: "153747", cargo: "AUXILIAR ADMINISTRATIVO", nivel: "Interno", status: "Ativo" }
+    { id: 6, nome: "Leticia Menezes Miziara De Medeiros", email: "l.medeiros1@procisa.com.br", senha: "153747", cargo: "AUXILIAR ADMINISTRATIVO", nivel: "Interno", status: "Ativo" },
+    // 5 Fiscais de Campo
+    { id: 7, nome: "SILMAR LEITE", nomeCompleto: "Silmar Leite Ribeiro", email: "s.leiteribei@procisa.com.br", senha: "150024", cargo: "FISCAL DE OPERACOES", nivel: "Fiscal", status: "Ativo" },
+    { id: 8, nome: "DIEGO ALVES", nomeCompleto: "Diego Alves Jardim Dos Santos", email: "d.santos5@procisa.com.br", senha: "150076", cargo: "FISCAL DE OPERACOES", nivel: "Fiscal", status: "Ativo" },
+    { id: 9, nome: "FABIO BARBOSA", nomeCompleto: "Fabio Santos De Mello Barbosa", email: "fabio.m.barbosa1989@gmail.com", senha: "150079", cargo: "FISCAL DE OPERACOES", nivel: "Fiscal", status: "Ativo" },
+    { id: 10, nome: "FABIO MANUEL DA SILVA", nomeCompleto: "Fabio Manuel Da Silva", email: "f.silva11@procisa.com.br", senha: "150299", cargo: "FISCAL DE OPERACOES", nivel: "Fiscal", status: "Ativo" },
+    { id: 11, nome: "ADEMIR MUNIZ", nomeCompleto: "Ademir Da Costa Muniz", email: "a.muniz1@procisa.com.br", senha: "150403", cargo: "FISCAL DE OPERACOES", nivel: "Fiscal", status: "Ativo" }
 ];
 
 const cacheFotosSobDemanda = new Map();
@@ -161,10 +162,17 @@ let FISCAIS_SISTEMA = JSON.parse(JSON.stringify(CATALOGO_FISCAIS_PADRAO));
 const CATALOGO_PROJETOS_SISTEMA = [
     { nome: "LANÇAMENTO 5G", grupo: "NODEB 5G", setor: "Lançamento" },
     { nome: "FUSÃO 5G", grupo: "NODEB 5G", setor: "Fusão" },
-    { nome: "OBRA CIVIL / SUBTERRÂNEA 5G", grupo: "NODEB 5G", setor: "Obra" }
+    { nome: "OBRA CIVIL / SUBTERRÂNEA 5G", grupo: "NODEB 5G", setor: "Obra" },
+    { nome: "FISCALIZAÇÃO LANÇAMENTO", grupo: "NODEB 5G", setor: "Fiscal" },
+    { nome: "FISCALIZAÇÃO FUSÃO", grupo: "NODEB 5G", setor: "Fiscal" }
 ];
-let PROJETOS_POR_SETOR = { "Lançamento": ["LANÇAMENTO 5G"], "Fusão": ["FUSÃO 5G"], "Obra": ["OBRA CIVIL / SUBTERRÂNEA 5G"] };
-let TODOS_OS_PROJETOS = ["LANÇAMENTO 5G", "FUSÃO 5G", "OBRA CIVIL / SUBTERRÂNEA 5G"];
+let PROJETOS_POR_SETOR = {
+    "Lançamento": ["LANÇAMENTO 5G"],
+    "Fusão": ["FUSÃO 5G"],
+    "Obra": ["OBRA CIVIL / SUBTERRÂNEA 5G"],
+    "Fiscal": ["FISCALIZAÇÃO LANÇAMENTO", "FISCALIZAÇÃO FUSÃO"]
+};
+let TODOS_OS_PROJETOS = ["LANÇAMENTO 5G", "FUSÃO 5G", "OBRA CIVIL / SUBTERRÂNEA 5G", "FISCALIZAÇÃO LANÇAMENTO", "FISCALIZAÇÃO FUSÃO"];
 
 let OPCOES_COMBUSTIVEL_PADRAO = ["ROTA LONGA ENTRE SITES / ANEL", "SALDO DO CARTÃO INSUFICIENTE", "APOIO A OUTRA EQUIPE 5G", "ATENDIMENTO EM OUTRO MUNICÍPIO", "EMERGÊNCIA"];
 let OPCOES_MATERIAL_SOLICITACAO = [
@@ -191,7 +199,7 @@ let OPCOES_IMPREVISTO_PADRAO = ["VEÍCULO COM DEFEITO", "AGUARDANDO MATERIAL", "
 
 let equipesSistema = lerJsonSeguroLocal('gpd5g_equipes_cadastradas', JSON.parse(JSON.stringify(BASE_CABECAS_EQUIPE_5G)));
 let telemetriaEquipes = lerJsonSeguroLocal('gpd5g_telemetria_equipes', {});
-let dadosAtendimento = { idEmAndamento: null, hEntrada: null, gpsEntrada: null, empresaSelecionada: "PROCISA", idSite: "", anel: "", fiscalResponsavel: "DIEGO ALVES", blocos: [] };
+let dadosAtendimento = { idEmAndamento: null, hEntrada: null, gpsEntrada: null, empresaSelecionada: "PROCISA", idSite: "", anel: "", fiscalResponsavel: "DIEGO ALVES", equipeFiscalizada: "", ehFiscal: false };
 let registrosSalvos = [];
 let usuariosSistema = JSON.parse(JSON.stringify(USUARIOS_PADRAO_5G));
 let usuarioLogado = sessionStorage.getItem('gpd5g_user_logado') || null;
@@ -202,9 +210,8 @@ let dadosFiltradosAtuais = [];
 let listaImprevistosAtuais = [];
 let listaSolicitacoesCombustivelAtuais = [];
 let listaSolicitacoesMaterialAtuais = [];
-let ultimoResumoCampoTexto = "";
 
-// ================= REGRAS DE PERMISSÃO E FILTRO DE CABEÇAS DE EQUIPE =================
+// ================= REGRAS DE PERMISSÃO E AGING =================
 function usuarioEhMaster() {
     return String(usuarioLogado || "").toLowerCase().trim() === EMAIL_MASTER_UNICO;
 }
@@ -212,12 +219,40 @@ function usuarioEhMaster() {
 function usuarioBloqueadoFinanceiro() {
     if (usuarioEhMaster()) return false;
     const cargo = String(usuarioObjetoLogado?.cargo || "").toUpperCase();
-    // Libera APENAS para CP DOCUMENTACAO (Aline) e CP CONSTRUCAO (Paula); bloqueia os demais internos
+    // Libera APENAS para CP DOCUMENTACAO (Aline) e CP CONSTRUCAO (Paula) + Master
     return !(cargo.includes("CP DOCUMENTACAO") || cargo.includes("CP CONSTRUCAO"));
+}
+
+function usuarioPodeTratarSolicitacoes() {
+    if (usuarioEhMaster()) return true;
+    const em = String(usuarioLogado || "").toLowerCase();
+    return em === "l.medeiros1@procisa.com.br" || em === "b.nascimento@procisa.com.br";
+}
+
+function usuarioPodeTratarFinanceiro() {
+    if (usuarioEhMaster()) return true;
+    const em = String(usuarioLogado || "").toLowerCase();
+    return em === "aqueiros@procisa.com.br" || em === "ps.cruz@procisa.com.br";
+}
+
+function usuarioPodeValidarFiscal(nomeFiscalAtividade) {
+    if (usuarioEhMaster()) return true;
+    if (!usuarioObjetoLogado || usuarioObjetoLogado.nivel !== "Fiscal") return false;
+    const fAtiv = String(nomeFiscalAtividade || "").toUpperCase().trim();
+    const fLog = String(usuarioObjetoLogado.nome || "").toUpperCase().trim();
+    const fLogComp = String(usuarioObjetoLogado.nomeCompleto || "").toUpperCase().trim();
+    return fAtiv === fLog || fAtiv === fLogComp || fLogComp.includes(fAtiv) || fAtiv.includes(fLog);
 }
 
 function exibirAvisoSomenteMaster(acao = "realizar esta ação") {
     alert(`🔒 ACESSO RESTRITO!\n\nSomente a conta Master (${EMAIL_MASTER_UNICO}) tem permissão para ${acao}.`);
+}
+
+function calcularAgingDias(dataISO) {
+    if (!dataISO || !/^\d{4}-\d{2}-\d{2}/.test(dataISO)) return 0;
+    const d1 = new Date(dataISO.substring(0, 10) + "T00:00:00");
+    const d2 = new Date(obterDataLocalISO() + "T00:00:00");
+    return Math.max(0, Math.floor((d2 - d1) / (1000 * 60 * 60 * 24)));
 }
 
 function ehCabecaDeEquipe(eq) {
@@ -225,6 +260,10 @@ function ehCabecaDeEquipe(eq) {
     const f = String(eq.funcao || "").toUpperCase();
     if (f.includes("OFICIAL DE REDE") || f.includes("AJ DE FIBRA") || f.includes("AJUDANTE") || f.includes("APRENDIZ")) return false;
     return true;
+}
+
+function ehPerfilFiscalCampo(nomeSelecionado) {
+    return (FISCAIS_SISTEMA || []).some(f => f.nome === nomeSelecionado || f.nomeCompleto === nomeSelecionado);
 }
 
 function atualizarIndicadorVisualRealtime(estado) {
@@ -269,6 +308,7 @@ function iniciarEscutaRealtimeSupabase() {
 
 function normalizarSetor5G(str) {
     const s = String(str || "").toUpperCase();
+    if (s.includes("FISCAL")) return "Fiscal";
     if (s.includes("FUSÃO") || s.includes("FUSAO")) return "Fusão";
     if (s.includes("OBRA")) return "Obra";
     return "Lançamento";
@@ -288,18 +328,22 @@ function obterProjetosPermitidosParaSetores(setorCampo) {
 function normalizarNomeProjeto(p) {
     const u = (p || '').toUpperCase().trim();
     if (u === PROJETO_SOLIC_COMBUSTIVEL || u === PROJETO_SOLIC_MATERIAL || u === 'IMPREVISTO / ATRASO') return u;
+    if (u.includes('FISCALIZAÇÃO FUSÃO') || u.includes('FISCALIZACAO FUSAO')) return 'FISCALIZAÇÃO FUSÃO';
+    if (u.includes('FISCALIZAÇÃO') || u.includes('FISCALIZACAO')) return 'FISCALIZAÇÃO LANÇAMENTO';
     if (u.includes('FUSÃO') || u.includes('FUSAO')) return 'FUSÃO 5G';
     if (u.includes('OBRA')) return 'OBRA CIVIL / SUBTERRÂNEA 5G';
     return 'LANÇAMENTO 5G';
 }
 function obterSetorDoProjeto(p) {
     const u = normalizarNomeProjeto(p);
+    if (u.includes("FISCAL")) return "Fiscal";
     if (u.includes("FUSÃO")) return "Fusão";
     if (u.includes("OBRA")) return "Obra";
     return "Lançamento";
 }
 function obterBadgeSetorHtml(setorCampo) {
     return `<div class="flex flex-wrap gap-1">` + obterArraySetores(setorCampo).map(s => {
+        if (s === 'Fiscal') return `<span class="bg-red-100 text-red-900 border border-red-300 font-bold px-2 py-0.5 rounded text-[10px]">👮 Fiscal</span>`;
         if (s === 'Fusão') return `<span class="bg-blue-100 text-blue-950 border border-blue-300 font-bold px-2 py-0.5 rounded text-[10px]">⚡ Fusão</span>`;
         if (s === 'Obra') return `<span class="bg-cyan-100 text-cyan-950 border border-cyan-300 font-bold px-2 py-0.5 rounded text-[10px]">🏗️ Obra</span>`;
         return `<span class="bg-orange-100 text-orange-950 border border-orange-300 font-bold px-2 py-0.5 rounded text-[10px]">🚀 Lançamento</span>`;
@@ -319,8 +363,10 @@ function obterClasseCorDesfecho(d) {
 }
 
 function converterLinhaBancoParaObjetoGpd(r) {
-    let obs = r.observacoes || '';
-    let end = '', anel = '', emp = 'PROCISA', fisc = '', tratadoPor = '', tratadoEm = '';
+    let obsBruta = r.observacoes || '';
+    let obs = obsBruta;
+    let end = '', anel = '', emp = 'PROCISA', fisc = '', eqFisc = '';
+    let validProdPor = '', validProdEm = '', validMatPor = '', validMatEm = '', tratFinPor = '', tratFinEm = '', almoco = '';
     let itens5g = { maoObra: {}, matSap: {}, matAx: {} };
     let fotos = [];
 
@@ -334,32 +380,33 @@ function converterLinhaBancoParaObjetoGpd(r) {
     }
     if (fotos.length > 0) cacheFotosSobDemanda.set(r.id, fotos);
 
+    const extrairTag = (regex) => { const m = obs.match(regex); if (m) { obs = obs.replace(m[0], '').trim(); return m[1].trim(); } return ''; };
     const mItens = obs.match(/\[ITENS5G:(\{.*?\})\]/);
     if (mItens) { try { itens5g = JSON.parse(mItens[1]); } catch (e) {} obs = obs.replace(mItens[0], '').trim(); }
-    const mEmp = obs.match(/\[EMPRESA:\s*([^\]]+)\]/i);
-    if (mEmp) { emp = mEmp[1].trim(); obs = obs.replace(mEmp[0], '').trim(); }
-    const mAnel = obs.match(/\[ANEL:\s*([^\]]+)\]/i);
-    if (mAnel) { anel = mAnel[1].trim(); obs = obs.replace(mAnel[0], '').trim(); }
-    const mFisc = obs.match(/\[FISCAL:\s*([^\]]+)\]/i);
-    if (mFisc) { fisc = mFisc[1].trim(); obs = obs.replace(mFisc[0], '').trim(); }
-    const mEnd = obs.match(/\[END:\s*([^\]]+)\]/i);
-    if (mEnd) { end = mEnd[1].trim(); obs = obs.replace(mEnd[0], '').trim(); }
-    const mTP = obs.match(/\[TRATADO_POR:\s*([^\]]+)\]/i);
-    if (mTP) { tratadoPor = mTP[1].trim(); obs = obs.replace(mTP[0], '').trim(); }
-    const mTE = obs.match(/\[TRATADO_EM:\s*([^\]]+)\]/i);
-    if (mTE) { tratadoEm = mTE[1].trim(); obs = obs.replace(mTE[0], '').trim(); }
+
+    emp = extrairTag(/\[EMPRESA:\s*([^\]]+)\]/i) || 'PROCISA';
+    anel = extrairTag(/\[ANEL:\s*([^\]]+)\]/i);
+    fisc = extrairTag(/\[FISCAL:\s*([^\]]+)\]/i);
+    eqFisc = extrairTag(/\[EQ_FISCALIZADA:\s*([^\]]+)\]/i);
+    end = extrairTag(/\[END:\s*([^\]]+)\]/i);
+    validProdPor = extrairTag(/\[VALID_PROD_POR:\s*([^\]]+)\]/i);
+    validProdEm = extrairTag(/\[VALID_PROD_EM:\s*([^\]]+)\]/i);
+    validMatPor = extrairTag(/\[VALID_MAT_POR:\s*([^\]]+)\]/i);
+    validMatEm = extrairTag(/\[VALID_MAT_EM:\s*([^\]]+)\]/i);
+    tratFinPor = extrairTag(/\[TRAT_FIN_POR:\s*([^\]]+)\]/i);
+    tratFinEm = extrairTag(/\[TRAT_FIN_EM:\s*([^\]]+)\]/i);
+    almoco = extrairTag(/\[ALMOCO:\s*([^\]]+)\]/i);
 
     return {
         id: r.id, dataRegistro: r.data_registro || '', equipe: (r.equipe || '').toUpperCase().trim(),
         empresa: emp, anel: anel || r.contato || '', fiscalResponsavel: fisc || r.responsavel || 'DIEGO ALVES',
-        projeto: normalizarNomeProjeto(r.projeto || ''), imovel: r.imovel || '', endereco: end,
-        itens5g, tratadoPor, tratadoDataHora: tratadoEm,
+        equipeFiscalizada: eqFisc, projeto: normalizarNomeProjeto(r.projeto || ''), imovel: r.imovel || '', endereco: end,
+        itens5g, validProdPor, validProdEm, validMatPor, validMatEm, tratFinPor, tratFinEm, almoco,
         hEntrada: r.h_entrada || '', hSaida: r.h_saida || '', gpsEntrada: r.gps_entrada || '', gpsSaida: r.gps_saida || '',
         desfecho: r.desfecho || '', motivoDesfecho: r.motivo_desfecho || '', malogros: Array.isArray(r.malogros) ? r.malogros : [],
-        andares: Number(r.andares) || 0, hps: Number(r.hps) || 0, observacoes: obs,
+        andares: Number(r.andares) || 0, hps: Number(r.hps) || 0, observacoes: obs, obsBrutaOriginal: obsBruta,
         caboRL: Number(r.cabo_rl) || 0, cxFosc: Number(r.cx_fosc) || 0, dio: Number(r.dio) || 0, fusoes: Number(r.fusoes) || 0,
-        fotos: cacheFotosSobDemanda.get(r.id) || [],
-        qtdFotos: (cacheFotosSobDemanda.get(r.id) || []).length
+        fotos: cacheFotosSobDemanda.get(r.id) || [], qtdFotos: (cacheFotosSobDemanda.get(r.id) || []).length
     };
 }
 
@@ -390,10 +437,7 @@ async function processarPacoteDadosNuvem(data, permitirUploadInicialConfig = fal
     if (!data) return;
     const rowEq = data.find(r => r.id === ID_NUVEM_EQUIPES);
     if (rowEq && rowEq.observacoes) {
-        try {
-            const arr = JSON.parse(rowEq.observacoes);
-            if (Array.isArray(arr) && arr.length > 0) equipesSistema = arr;
-        } catch (e) {}
+        try { const arr = JSON.parse(rowEq.observacoes); if (Array.isArray(arr) && arr.length > 0) equipesSistema = arr; } catch (e) {}
     } else if (permitirUploadInicialConfig) await sincronizarEquipesNaNuvem();
 
     const rowRast = data.find(r => r.id === ID_NUVEM_RASTREIO);
@@ -403,9 +447,8 @@ async function processarPacoteDadosNuvem(data, permitirUploadInicialConfig = fal
 
     const reais = data.filter(r => ![ID_NUVEM_USUARIOS, ID_NUVEM_EQUIPES, ID_NUVEM_OPCOES, ID_NUVEM_RASTREIO, ID_NUVEM_AUDITORIA].includes(r.id) && r.equipe !== '__CONFIG_SISTEMA__');
     const conv = reais.map(converterLinhaBancoParaObjetoGpd);
-    if (substituirTudo) {
-        registrosSalvos = conv;
-    } else {
+    if (substituirTudo) registrosSalvos = conv;
+    else {
         const mapa = new Map();
         (registrosSalvos || []).forEach(i => mapa.set(i.id, i));
         conv.forEach(i => mapa.set(i.id, i));
@@ -435,23 +478,33 @@ function popularSelectProjetosGlobal() {
     if (sel) sel.innerHTML = `<option value="">🏗️ Todas as Classes 5G</option>` + CATALOGO_PROJETOS_SISTEMA.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
 }
 
-// SOMENTE CABEÇAS DE EQUIPE (SEM OFICIAL DE REDE / AJUDANTE DE FIBRA)
+// CABEÇAS DE EQUIPE + FISCAIS (NO MODO CAMPO)
 function popularSelectEquipes() {
     const selCampo = document.getElementById('sel-equipe');
     const selFiltro = document.getElementById('gestor-filtro-equipe');
     const vAtual = selCampo ? selCampo.value : "";
-    if (selCampo) selCampo.innerHTML = '<option value="">Selecione o Cabeça de Equipe...</option>';
+    if (selCampo) selCampo.innerHTML = '<option value="">Selecione o Cabeça de Equipe ou Fiscal...</option>';
     if (selFiltro) selFiltro.innerHTML = '<option value="">👥 Todos os Cabeças de Equipe</option>';
 
     const cabecas = (equipesSistema || []).filter(eq => eq && eq.nome && ehCabecaDeEquipe(eq));
     cabecas.sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
 
-    cabecas.forEach(eq => {
-        const icone = normalizarSetor5G(eq.setor) === 'Fusão' ? '🔵' : '🟠';
-        const lbl = `${icone} ${eq.numeroEquipe ? `[${eq.numeroEquipe}] ` : ''}${eq.nome} (${eq.empresa || 'PROCISA'} • ${eq.setor})`;
-        if (eq.status === "Ativo" && selCampo) selCampo.innerHTML += `<option value="${eq.nome}">${lbl}</option>`;
-        if (selFiltro) selFiltro.innerHTML += `<option value="${eq.nome}">${lbl}</option>`;
-    });
+    if (selCampo) {
+        selCampo.innerHTML += `<optgroup label="👷 Cabeças de Equipe (Lançamento / Fusão)">` +
+            cabecas.filter(e => e.status === "Ativo").map(eq => {
+                const icone = normalizarSetor5G(eq.setor) === 'Fusão' ? '🔵' : '🟠';
+                return `<option value="${eq.nome}">${icone} [${eq.numeroEquipe || 'EQ'}] ${eq.nome} (${eq.empresa} • ${eq.setor})</option>`;
+            }).join('') + `</optgroup>`;
+        selCampo.innerHTML += `<optgroup label="👮 Fiscais de Operações (Classe Fiscal)">` +
+            (FISCAIS_SISTEMA || []).map(f => `<option value="${f.nome}">🔴 [FISCAL] ${f.nome} (${f.regiao})</option>`).join('') + `</optgroup>`;
+    }
+
+    if (selFiltro) {
+        cabecas.forEach(eq => {
+            const icone = normalizarSetor5G(eq.setor) === 'Fusão' ? '🔵' : '🟠';
+            selFiltro.innerHTML += `<option value="${eq.nome}">${icone} ${eq.nome} (${eq.setor})</option>`;
+        });
+    }
     if (selCampo && (vAtual || equipeAutenticadaSessao)) selCampo.value = vAtual || equipeAutenticadaSessao;
 }
 
@@ -462,7 +515,7 @@ function atualizarBarraSegurancaPinCampo() {
     if (selEq.value && equipeAutenticadaSessao === selEq.value) {
         selEq.disabled = true;
         barra.classList.remove('hidden');
-        barra.innerHTML = `<span class="text-emerald-800 font-bold">🔒 PIN Autenticado</span><div class="flex gap-1"><button type="button" onclick="alterarPinPeloTecnicoCampo()" class="bg-blue-100 text-blue-900 font-bold px-2 py-0.5 rounded">🔑 PIN</button><button type="button" onclick="desbloquearTrocaEquipeCampo()" class="bg-red-50 text-red-700 font-bold px-2 py-0.5 rounded">🚪 Sair</button></div>`;
+        barra.innerHTML = `<span class="text-emerald-800 font-bold">🔒 Autenticado</span><div class="flex gap-1"><button type="button" onclick="registrarPausaAlmocoCampo()" class="bg-fuchsia-600 text-white font-bold px-2 py-0.5 rounded">🍽️ Almoço</button><button type="button" onclick="desbloquearTrocaEquipeCampo()" class="bg-red-50 text-red-700 font-bold px-2 py-0.5 rounded">🚪 Sair</button></div>`;
     } else {
         selEq.disabled = false;
         barra.classList.add('hidden');
@@ -473,14 +526,14 @@ function verificarPermissoesSessao() {
     if (!usuarioLogado) { usuarioObjetoLogado = null; nivelUsuarioLogado = "Interno"; return; }
     const u = usuariosSistema.find(x => x.email.toLowerCase() === usuarioLogado.toLowerCase());
     usuarioObjetoLogado = u || { nome: usuarioLogado, email: usuarioLogado, cargo: "INTERNO", nivel: "Interno" };
-    nivelUsuarioLogado = usuarioEhMaster() ? "Master" : (usuarioObjetoLogado.cargo || "Interno");
+    nivelUsuarioLogado = usuarioEhMaster() ? "Master" : (usuarioObjetoLogado.nivel === "Fiscal" ? `Fiscal (${usuarioObjetoLogado.nome})` : (usuarioObjetoLogado.cargo || "Interno"));
 }
 
 async function tentarAcessarGestor() {
     if (usuarioLogado) { alternarVisao('gestor'); return; }
-    let email = prompt("🔒 Digite seu e-mail corporativo (@procisa.com.br):")?.trim().toLowerCase();
+    let email = prompt("🔒 Digite seu e-mail de acesso:")?.trim().toLowerCase();
     if (!email) return;
-    let senha = prompt("🔑 Digite sua senha (Internos: sua matrícula):")?.trim();
+    let senha = prompt("🔑 Digite sua senha (Internos e Fiscais: sua matrícula):")?.trim();
     if (!senha) return;
 
     const u = usuariosSistema.find(x => x.email.toLowerCase() === email && String(x.senha) === String(senha) && x.status === "Ativo");
@@ -516,7 +569,7 @@ function alternarVisao(visao) {
         verificarPermissoesSessao();
         vG?.classList.remove('hidden'); vC?.classList.add('hidden');
         bA?.classList.remove('hidden'); sB?.classList.remove('hidden');
-        if (typeof atualizarDashboardGestor === "function") atualizarDashboardGestor();
+        if (typeof mudarSubAbaGestor === "function") mudarSubAbaGestor('disponibilidade');
     } else {
         vG?.classList.add('hidden'); vC?.classList.remove('hidden');
         bA?.classList.add('hidden'); sB?.classList.add('hidden');

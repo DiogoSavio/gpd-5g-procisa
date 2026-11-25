@@ -1,124 +1,85 @@
-// ================= GESTOR.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V3) =================
+// ================= GESTOR.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V4 - GANTT, VALIDAÇÃO FISCAL & MAPA) =================
 let mapaRastreioInstancia = null;
 let camadaMarcadoresRastreio = null;
 let coordenadasPinosAtuais = [];
+let fiscalFiltroGantt = "TODOS"; // "TODOS" = Diogo Savio (Visão Geral)
 
-// Estado dos filtros estilo Excel por coluna
 let filtrosColAtiv = { site: "", equipe: "", classe: "", status: "", horario: "", gps: "" };
-let filtrosColDisp = { equipe: "", classe: "", turno: "", status: "", detalhe: "" };
 let filtroBuscaEquipe = "";
 
 function inicializarCustomizacoesVisuais5GGestor() {
-    // 1. Injeta barra de botões na aba Equipes & Parceiros (Carregar 24 Cabeças + Filtro + Excluir Selecionados)
-    const btnNovaEq = document.getElementById('btn-nova-equipe');
-    if (btnNovaEq && !document.getElementById('btn-importar-cabecas-5g')) {
-        const wrap = btnNovaEq.parentNode;
-        const btnBase = document.createElement('button');
-        btnBase.id = 'btn-importar-cabecas-5g';
-        btnBase.onclick = importarBase24Cabecas5G;
-        btnBase.className = 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold mr-1.5';
-        btnBase.innerText = '📥 Carregar 24 Cabeças (Lanç./Fusão)';
-        wrap.insertBefore(btnBase, btnNovaEq);
+    // 1. Injeta botão e subview da nova aba "Produção Equipe" e reordena as abas exatamente como solicitado
+    const btnAtiv = document.getElementById('subtab-btn-atividades');
+    if (btnAtiv && !document.getElementById('subtab-btn-producao_equipe')) {
+        const navContainer = btnAtiv.parentNode;
+        const btnProd = document.createElement('button');
+        btnProd.id = 'subtab-btn-producao_equipe';
+        btnProd.onclick = () => mudarSubAbaGestor('producao_equipe');
+        btnProd.className = "px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1";
+        btnProd.innerHTML = `📋 Produção Equipe (<span id="badge-aba-prod-pend" class="text-amber-600">0 pend.</span>)`;
+        navContainer.appendChild(btnProd);
 
-        const btnExcLote = document.createElement('button');
-        btnExcLote.id = 'btn-excluir-equipes-lote';
-        btnExcLote.onclick = excluirEquipesSelecionadasEmLote;
-        btnExcLote.className = 'bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold mr-1.5';
-        btnExcLote.innerText = '🗑️ Excluir Selecionados';
-        wrap.insertBefore(btnExcLote, btnBase);
+        // Cria o container da subview Produção Equipe
+        const viewGestor = document.getElementById('view-gestor');
+        const subProd = document.createElement('div');
+        subProd.id = 'subview-producao_equipe';
+        subProd.className = 'hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden';
+        subProd.innerHTML = `
+            <div class="p-4 border-b bg-slate-50 flex justify-between items-center">
+                <div><h3 class="font-black text-blue-950 text-sm">📋 Validação Fiscal — Produção por Equipe</h3><p class="text-[11px] text-slate-500">Somente o Fiscal apontado pela equipe (ou Master) pode validar para liberar à Medição Financeira.</p></div>
+                <span id="contador-prod-equipe" class="text-xs font-bold bg-blue-100 text-blue-900 px-3 py-1 rounded-full">0 registros</span>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                <thead><tr class="bg-slate-100 text-slate-600 text-[11px] uppercase border-b"><th class="p-3">Data / Site / Anel</th><th class="p-3">Equipe / Empresa</th><th class="p-3">Serviços Executados</th><th class="p-3">Fiscal Apontado</th><th class="p-3 text-center">Aging</th><th class="p-3">Status Validação</th><th class="p-3">Ação</th></tr></thead>
+                <tbody id="tabela-producao-equipe-corpo"></tbody>
+            </table></div>`;
+        viewGestor.appendChild(subProd);
+
+        // Reordena os botões na sequência exata solicitada
+        const ordemIds = [
+            'subtab-btn-disponibilidade', 'subtab-btn-atividades', 'subtab-btn-graficos',
+            'subtab-btn-mapa', 'subtab-btn-producao_equipe', 'subtab-btn-materiais',
+            'subtab-btn-combustivel', 'subtab-btn-solicitacao_material', 'subtab-btn-imprevistos',
+            'subtab-btn-financeiro', 'subtab-btn-equipes', 'subtab-btn-opcoes',
+            'subtab-btn-usuarios', 'subtab-btn-bonificacao', 'subtab-btn-auditoria'
+        ];
+        ordemIds.forEach(id => { const el = document.getElementById(id); if (el) navContainer.appendChild(el); });
     }
 
-    const subEq = document.getElementById('subview-equipes');
-    if (subEq && !document.getElementById('inp-filtro-equipes-rapido')) {
-        const divF = document.createElement('div');
-        divF.className = 'flex flex-wrap gap-2 items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200';
-        divF.innerHTML = `
-            <input type="text" id="inp-filtro-equipes-rapido" oninput="filtroBuscaEquipe=this.value.toLowerCase(); renderizarTabelaEquipes();" placeholder="🔍 Filtrar por nome, empresa, classe, região ou fiscal..." class="flex-1 min-w-[220px] text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-white outline-none">
-            <span class="text-[11px] font-bold text-slate-500" id="lbl-qtd-sel-equipes">0 selecionado(s)</span>`;
-        subEq.insertBefore(divF, subEq.querySelector('.overflow-x-auto'));
-    }
-
-    // 2. Filtros estilo Excel nas colunas de SITES / ATIVIDADES
+    // 2. Filtros estilo Excel em SITES / ATIVIDADES
     const theadAtiv = document.querySelector('#subview-atividades table thead');
     if (theadAtiv && !document.getElementById('row-filtros-excel-ativ')) {
         const trF = document.createElement('tr');
         trF.id = 'row-filtros-excel-ativ';
         trF.className = 'bg-blue-50/70 border-b';
         trF.innerHTML = `
-            <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.site=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 Filtrar Site/End..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
-            <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.equipe=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 Equipe/Emp/Fiscal..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
+            <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.site=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 Site/End..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
+            <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.equipe=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 Equipe/Fiscal..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
             <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.classe=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 Classe/Anel..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
             <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.status=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 Status..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
             <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.horario=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 Horário..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
             <th class="p-1.5"><input type="text" oninput="filtrosColAtiv.gps=this.value.toLowerCase(); atualizarDashboardGestor();" placeholder="🔎 GPS..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
-            <th class="p-1.5 text-center"><button onclick="limparFiltrosExcelAtiv()" class="text-[9px] bg-slate-200 hover:bg-slate-300 px-1.5 py-1 rounded font-bold">Limpar</button></th>`;
+            <th class="p-1.5 text-center"><button onclick="limparFiltrosExcelAtiv()" class="text-[9px] bg-slate-200 px-1.5 py-1 rounded font-bold">Limpar</button></th>`;
         theadAtiv.appendChild(trF);
     }
 
-    // 3. Filtros estilo Excel nas colunas de DISPONIBILIDADE
-    const theadDisp = document.querySelector('#subview-disponibilidade table thead');
-    if (theadDisp && !document.getElementById('row-filtros-excel-disp')) {
-        const trD = document.createElement('tr');
-        trD.id = 'row-filtros-excel-disp';
-        trD.className = 'bg-blue-50/70 border-b';
-        trD.innerHTML = `
-            <th class="p-1.5"><input type="text" oninput="filtrosColDisp.equipe=this.value.toLowerCase(); renderizarPainelDisponibilidadeEMapa();" placeholder="🔎 Cabeça de Equipe..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
-            <th class="p-1.5"><input type="text" oninput="filtrosColDisp.classe=this.value.toLowerCase(); renderizarPainelDisponibilidadeEMapa();" placeholder="🔎 Lanç./Fusão..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
-            <th class="p-1.5"><input type="text" oninput="filtrosColDisp.turno=this.value.toLowerCase(); renderizarPainelDisponibilidadeEMapa();" placeholder="🔎 Turno..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
-            <th class="p-1.5"><input type="text" oninput="filtrosColDisp.status=this.value.toLowerCase(); renderizarPainelDisponibilidadeEMapa();" placeholder="🔎 Status..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
-            <th class="p-1.5"><input type="text" oninput="filtrosColDisp.detalhe=this.value.toLowerCase(); renderizarPainelDisponibilidadeEMapa();" placeholder="🔎 Site/Detalhe..." class="w-full text-[10px] border rounded px-1.5 py-1 bg-white font-normal"></th>
-            <th class="p-1.5"></th>
-            <th class="p-1.5 text-center"><button onclick="limparFiltrosExcelDisp()" class="text-[9px] bg-slate-200 hover:bg-slate-300 px-1.5 py-1 rounded font-bold">Limpar</button></th>`;
-        theadDisp.appendChild(trD);
-    }
+    // 3. Botões de Equipes (Carregar 24 Cabeças + Excluir em Lote)
+    const btnNovaEq = document.getElementById('btn-nova-equipe');
+    if (btnNovaEq && !document.getElementById('btn-importar-cabecas-5g')) {
+        const wrap = btnNovaEq.parentNode;
+        const btnBase = document.createElement('button');
+        btnBase.id = 'btn-importar-cabecas-5g';
+        btnBase.onclick = importarBase24Cabecas5G;
+        btnBase.className = 'bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold mr-1.5';
+        btnBase.innerText = '📥 Carregar 24 Cabeças';
+        wrap.insertBefore(btnBase, btnNovaEq);
 
-    // 4. Modal Completo de Equipes
-    const modalEq = document.getElementById('modal-equipe');
-    if (modalEq && !modalEq.dataset.customizado5gV3) {
-        modalEq.dataset.customizado5gV3 = "true";
-        modalEq.innerHTML = `
-            <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border flex flex-col max-h-[92vh]">
-                <div class="bg-blue-900 text-white p-4 flex justify-between items-center border-b-4 border-cyan-400">
-                    <h3 class="font-bold text-sm">👷 Cadastrar / Editar Equipe e Colaborador</h3>
-                    <button onclick="fecharModalEquipe()" class="text-white font-bold text-lg">✕</button>
-                </div>
-                <div class="p-4 overflow-y-auto space-y-3 text-xs text-slate-700">
-                    <input type="hidden" id="edit-equipe-id">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-xl border">
-                        <div><label class="block font-black text-blue-950 mb-1">🏢 Empresa *</label><select id="inp-empresa-equipe" onchange="aoMudarEmpresaNoModalEquipe(this.value)" class="w-full border rounded-lg p-2 bg-white font-bold"></select></div>
-                        <div><label class="block font-black text-blue-950 mb-1">🔢 Nº Equipe *</label><input type="text" id="inp-numero-equipe" placeholder="Ex: L-01 / F-01" class="w-full border rounded-lg p-2 uppercase font-bold"></div>
-                        <div id="box-matricula-procisa"><label class="block font-black text-emerald-900 mb-1">🪪 Matrícula</label><input type="text" id="inp-matricula-equipe" class="w-full border border-emerald-400 rounded-lg p-2 bg-emerald-50 font-bold"></div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div><label class="block font-bold mb-1">👷 Nome Completo *</label><input type="text" id="inp-nome-equipe" class="w-full border rounded-lg p-2 uppercase font-bold"></div>
-                        <div><label class="block font-bold mb-1">💼 Função</label><input type="text" id="inp-funcao-equipe" placeholder="LIDER DE EQUIPE / TEC FIBRA OPTICA" class="w-full border rounded-lg p-2 uppercase"></div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                        <div><label class="block font-bold mb-1">🪪 RG</label><input type="text" id="inp-rg-equipe" class="w-full border rounded-lg p-2"></div>
-                        <div><label class="block font-bold mb-1">🪪 CPF</label><input type="text" id="inp-cpf-equipe" class="w-full border rounded-lg p-2"></div>
-                        <div><label class="block font-bold mb-1">🚗 Veículo/Placa</label><input type="text" id="inp-veiculo-equipe" class="w-full border rounded-lg p-2 uppercase"></div>
-                        <div><label class="block font-bold mb-1">📱 Celular</label><input type="text" id="inp-celular-equipe" class="w-full border rounded-lg p-2"></div>
-                    </div>
-                    <div>
-                        <label class="block font-black mb-1">🛠️ Classe de Atuação: *</label>
-                        <input type="hidden" id="inp-setor-equipe" value="Lançamento">
-                        <div class="grid grid-cols-3 gap-2 bg-slate-100 p-1.5 rounded-xl border">
-                            <button type="button" id="btn-chave-lancamento" onclick="alternarChaveSetorEquipe5G('Lançamento')" class="py-2 rounded-lg font-bold text-xs bg-orange-600 text-white">🚀 Lançamento</button>
-                            <button type="button" id="btn-chave-fusao" onclick="alternarChaveSetorEquipe5G('Fusão')" class="py-2 rounded-lg font-bold text-xs bg-white text-slate-700">⚡ Fusão</button>
-                            <button type="button" id="btn-chave-obra" onclick="alternarChaveSetorEquipe5G('Obra')" class="py-2 rounded-lg font-bold text-xs bg-white text-slate-700">🏗️ Obra</button>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <div><label class="block font-bold mb-1">👮 Fiscal *</label><select id="inp-fiscal-equipe" class="w-full border rounded-lg p-2 bg-white font-bold"></select></div>
-                        <div><label class="block font-bold mb-1">📍 Região</label><input type="text" id="inp-area-equipe" class="w-full border rounded-lg p-2 uppercase"></div>
-                        <div><label class="block font-bold mb-1">🎯 Status</label><select id="sel-status-equipe" class="w-full border rounded-lg p-2 bg-white font-bold"><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select></div>
-                    </div>
-                </div>
-                <div class="bg-slate-100 p-3 border-t flex justify-end gap-2">
-                    <button onclick="fecharModalEquipe()" class="bg-slate-300 text-slate-700 text-xs px-4 py-2 rounded-xl font-bold">Cancelar</button>
-                    <button onclick="salvarOuAtualizarEquipe()" class="bg-blue-900 text-white text-xs px-5 py-2 rounded-xl font-black">💾 Salvar</button>
-                </div>
-            </div>`;
+        const btnExcLote = document.createElement('button');
+        btnExcLote.id = 'btn-excluir-equipes-lote';
+        btnExcLote.onclick = excluirEquipesSelecionadasEmLote;
+        btnExcLote.className = 'bg-red-600 text-white text-xs px-3 py-2 rounded-lg font-bold mr-1.5';
+        btnExcLote.innerText = '🗑️ Excluir Selecionados';
+        wrap.insertBefore(btnExcLote, btnBase);
     }
 }
 
@@ -127,188 +88,64 @@ function limparFiltrosExcelAtiv() {
     document.querySelectorAll('#row-filtros-excel-ativ input').forEach(i => i.value = "");
     atualizarDashboardGestor();
 }
-function limparFiltrosExcelDisp() {
-    filtrosColDisp = { equipe: "", classe: "", turno: "", status: "", detalhe: "" };
-    document.querySelectorAll('#row-filtros-excel-disp input').forEach(i => i.value = "");
-    renderizarPainelDisponibilidadeEMapa();
+
+// ================= CONSOLE DE ALOCAÇÃO (GANTT) NA ABA DISPONIBILIDADE =================
+function horaParaMinutos(hStr) {
+    if (!hStr || !hStr.includes(':')) return null;
+    const [h, m] = hStr.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
 }
 
-async function importarBase24Cabecas5G() {
-    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("substituir ou importar a base oficial de equipes"); return; }
-    if (!confirm("📥 Carregar os 24 Cabeças de Equipe oficiais (12 Lançamento + 12 Fusão) substituindo a lista antiga (removendo oficiais/ajudantes)?")) return;
-    equipesSistema = JSON.parse(JSON.stringify(BASE_CABECAS_EQUIPE_5G));
-    await sincronizarEquipesNaNuvem();
-    popularSelectEquipes();
-    renderizarTabelaEquipes();
-    alert("✅ 24 Cabeças de Equipe sincronizados com sucesso!");
-}
-
-function aoMudarEmpresaNoModalEquipe(emp) { document.getElementById('box-matricula-procisa')?.classList.toggle('hidden', emp !== 'PROCISA'); }
-function alternarChaveSetorEquipe5G(c) {
-    const inp = document.getElementById('inp-setor-equipe');
-    let atuais = obterArraySetores(inp.value);
-    if (atuais.includes(c)) { if (atuais.length > 1) atuais = atuais.filter(x => x !== c); } else atuais.push(c);
-    inp.value = formatarSetoresString(atuais);
-    const setB = (id, on, cor) => { const b = document.getElementById(id); if (b) b.className = on ? `py-2 rounded-lg font-black text-xs ${cor} text-white` : `py-2 rounded-lg font-bold text-xs bg-white text-slate-600 border`; };
-    setB('btn-chave-lancamento', atuais.includes('Lançamento'), 'bg-orange-600');
-    setB('btn-chave-fusao', atuais.includes('Fusão'), 'bg-blue-800');
-    setB('btn-chave-obra', atuais.includes('Obra'), 'bg-cyan-800');
-}
-
-function abrirModalEquipe(id = null) {
-    inicializarCustomizacoesVisuais5GGestor();
-    document.getElementById('inp-empresa-equipe').innerHTML = (PARCEIROS_SISTEMA || []).map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
-    document.getElementById('inp-fiscal-equipe').innerHTML = (FISCAIS_SISTEMA || []).map(f => `<option value="${f.nome}">${f.nome} (${f.regiao})</option>`).join('');
-    const eq = id ? equipesSistema.find(e => e.id === id) : null;
-    document.getElementById('edit-equipe-id').value = eq ? eq.id : "";
-    document.getElementById('inp-empresa-equipe').value = eq?.empresa || "PROCISA";
-    document.getElementById('inp-numero-equipe').value = eq?.numeroEquipe || "";
-    document.getElementById('inp-matricula-equipe').value = eq?.matricula || "";
-    document.getElementById('inp-nome-equipe').value = eq?.nome || "";
-    document.getElementById('inp-funcao-equipe').value = eq?.funcao || "LIDER DE EQUIPE";
-    document.getElementById('inp-rg-equipe').value = eq?.rg || "";
-    document.getElementById('inp-cpf-equipe').value = eq?.cpf || "";
-    document.getElementById('inp-veiculo-equipe').value = eq?.veiculo || "";
-    document.getElementById('inp-celular-equipe').value = eq?.celular || "";
-    document.getElementById('inp-setor-equipe').value = eq ? formatarSetoresString(eq.setor) : "Lançamento";
-    document.getElementById('inp-fiscal-equipe').value = eq?.fiscal || FISCAIS_SISTEMA[0].nome;
-    document.getElementById('inp-area-equipe').value = eq?.areaAtuacao || "";
-    document.getElementById('sel-status-equipe').value = eq?.status || "Ativo";
-    aoMudarEmpresaNoModalEquipe(eq?.empresa || "PROCISA");
-    document.getElementById('modal-equipe')?.classList.remove('hidden');
-}
-function fecharModalEquipe() { document.getElementById('modal-equipe')?.classList.add('hidden'); }
-
-async function salvarOuAtualizarEquipe() {
-    const idEdit = document.getElementById('edit-equipe-id').value;
-    const nome = document.getElementById('inp-nome-equipe').value.trim().toUpperCase();
-    if (!nome) return;
-    const obj = {
-        id: idEdit ? Number(idEdit) : Date.now(),
-        empresa: document.getElementById('inp-empresa-equipe').value,
-        numeroEquipe: document.getElementById('inp-numero-equipe').value.trim().toUpperCase(),
-        matricula: document.getElementById('inp-matricula-equipe').value.trim().toUpperCase(),
-        nome, funcao: document.getElementById('inp-funcao-equipe').value.trim().toUpperCase(),
-        rg: document.getElementById('inp-rg-equipe').value.trim(),
-        cpf: document.getElementById('inp-cpf-equipe').value.trim(),
-        veiculo: document.getElementById('inp-veiculo-equipe').value.trim().toUpperCase(),
-        celular: document.getElementById('inp-celular-equipe').value.trim(),
-        setor: formatarSetoresString(document.getElementById('inp-setor-equipe').value),
-        fiscal: document.getElementById('inp-fiscal-equipe').value,
-        areaAtuacao: document.getElementById('inp-area-equipe').value.trim().toUpperCase(),
-        status: document.getElementById('sel-status-equipe').value, pin: "1234", ehCabeca: true
-    };
-    if (idEdit) { const i = equipesSistema.findIndex(e => e.id == idEdit); if (i !== -1) { obj.pin = equipesSistema[i].pin || "1234"; equipesSistema[i] = obj; } }
-    else equipesSistema.push(obj);
-    await sincronizarEquipesNaNuvem();
-    fecharModalEquipe();
-    popularSelectEquipes();
-    renderizarTabelaEquipes();
-}
-
-// ================= MÚLTIPLA SELEÇÃO E EXCLUSÃO EM LOTE (EQUIPES & PARCEIROS) =================
-function alternarTodosCheckboxesEquipes(masterChk) {
-    document.querySelectorAll('.chk-equipe-lote').forEach(c => c.checked = masterChk.checked);
-    atualizarContadorSelecaoEquipes();
-}
-function atualizarContadorSelecaoEquipes() {
-    const qtd = document.querySelectorAll('.chk-equipe-lote:checked').length;
-    const el = document.getElementById('lbl-qtd-sel-equipes');
-    if (el) el.innerText = `${qtd} selecionado(s)`;
-}
-async function excluirEquipesSelecionadasEmLote() {
-    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("excluir equipes ou colaboradores"); return; }
-    const ids = Array.from(document.querySelectorAll('.chk-equipe-lote:checked')).map(c => Number(c.value));
-    if (ids.length === 0) { alert("⚠️ Selecione pelo menos 1 equipe na caixa de marcação."); return; }
-    if (!confirm(`🗑️ Confirma a exclusão em lote de ${ids.length} equipe(s) selecionada(s)?`)) return;
-    const setIds = new Set(ids);
-    equipesSistema = equipesSistema.filter(e => !setIds.has(Number(e.id)));
-    await sincronizarEquipesNaNuvem();
-    popularSelectEquipes();
-    renderizarTabelaEquipes();
-    alert(`✅ ${ids.length} equipe(s) excluída(s) com sucesso!`);
-}
-
-function renderizarTabelaEquipes() {
-    inicializarCustomizacoesVisuais5GGestor();
-    const corpo = document.getElementById('tabela-equipes-corpo');
-    if (!corpo) return;
-    const th = corpo.closest('table')?.querySelector('thead tr');
-    if (th) {
-        th.innerHTML = `
-            <th class="p-3 w-8 text-center"><input type="checkbox" onclick="alternarTodosCheckboxesEquipes(this)" class="w-4 h-4 accent-blue-900 cursor-pointer" title="Selecionar Todos"></th>
-            <th class="p-3">Equipe / Colaborador & PIN</th>
-            <th class="p-3">Empresa / Matrícula / Função</th>
-            <th class="p-3">RG / CPF / Veículo</th>
-            <th class="p-3">Classe 5G</th>
-            <th class="p-3">Fiscal & Região</th>
-            <th class="p-3">Ações</th>`;
-    }
-    const listaFiltrada = (equipesSistema || []).filter(eq => {
-        if (!filtroBuscaEquipe) return true;
-        const txt = `${eq.numeroEquipe} ${eq.nome} ${eq.empresa} ${eq.setor} ${eq.fiscal} ${eq.areaAtuacao} ${eq.funcao}`.toLowerCase();
-        return txt.includes(filtroBuscaEquipe);
-    });
-
-    corpo.innerHTML = listaFiltrada.map(eq => `
-        <tr class="hover:bg-slate-50 border-b text-xs">
-            <td class="p-3 text-center"><input type="checkbox" value="${eq.id}" onchange="atualizarContadorSelecaoEquipes()" class="chk-equipe-lote w-4 h-4 accent-blue-900 cursor-pointer"></td>
-            <td class="p-3"><span class="bg-blue-900 text-white font-black text-[10px] px-2 py-0.5 rounded">${eq.numeroEquipe || 'S/N'}</span><div class="font-black text-slate-800 mt-0.5">${eq.nome}</div><span class="text-[10px] font-mono bg-amber-50 text-amber-900 border px-1.5 rounded">🔑 ${eq.pin || '1234'}</span></td>
-            <td class="p-3"><span class="font-black text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[10px]">${eq.empresa || 'PROCISA'}</span><div class="text-[10px] font-bold text-slate-600 mt-0.5">${eq.funcao || '-'}</div>${eq.matricula ? `<div class="text-[10px] text-emerald-800 font-bold">🪪 Mat: ${eq.matricula}</div>` : ''}</td>
-            <td class="p-3 text-[10px]"><div><b>RG:</b> ${eq.rg || '-'} | <b>CPF:</b> ${eq.cpf || '-'}</div><div class="font-bold text-slate-700">🚗 ${eq.veiculo || '-'}</div></td>
-            <td class="p-3">${obterBadgeSetorHtml(eq.setor)}</td>
-            <td class="p-3"><div class="font-bold text-indigo-950 text-[10px]">👮 ${eq.fiscal || '-'}</div><div class="text-[10px] text-slate-500">📍 ${eq.areaAtuacao || '-'}</div></td>
-            <td class="p-3 whitespace-nowrap"><button onclick="abrirModalEquipe(${eq.id})" class="bg-blue-50 text-blue-700 border font-bold text-[10px] px-2 py-1 rounded">✏️ Editar</button> <button onclick="excluirEquipe(${eq.id}, '${eq.nome}')" class="bg-red-50 text-red-600 border font-bold text-[10px] px-2 py-1 rounded">🗑️</button></td>
-        </tr>`).join('');
-    atualizarContadorSelecaoEquipes();
-}
-
-async function excluirEquipe(id, nome) {
-    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("excluir equipes ou colaboradores"); return; }
-    if (confirm(`Excluir "${nome}"?`)) {
-        equipesSistema = equipesSistema.filter(e => e.id !== id);
-        await sincronizarEquipesNaNuvem();
-        renderizarTabelaEquipes();
-        popularSelectEquipes();
-    }
-}
-
-// ================= DISPONIBILIDADE (SOMENTE CABEÇAS DE EQUIPE) + MAPA =================
 function renderizarPainelDisponibilidadeEMapa() {
-    const tbody = document.getElementById('tabela-disponibilidade-corpo');
     const hojeISO = obterDataLocalISO();
+    const agora = new Date();
+    const minAgora = agora.getHours() * 60 + agora.getMinutes();
+    const horaAgoraStr = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const inicioDiaMin = 7 * 60;  // 07:00
+    const fimDiaMin = 20 * 60;    // 20:00
+    const totalDiaMin = fimDiaMin - inicioDiaMin;
+    const pctAgora = Math.min(100, Math.max(0, ((minAgora - inicioDiaMin) / totalDiaMin) * 100));
+
+    const cabecasAtivos = (equipesSistema || []).filter(e => e.status === "Ativo" && ehCabecaDeEquipe(e));
     const pinos = [];
     let indisp = 0;
 
-    if (tbody) tbody.innerHTML = "";
-    const cabecasAtivos = (equipesSistema || []).filter(e => e.status === "Ativo" && ehCabecaDeEquipe(e));
-
-    cabecasAtivos.forEach(eq => {
-        const regsHoje = (registrosSalvos || []).filter(r => r.dataRegistro === hojeISO && r.equipe === eq.nome);
+    // Monta os dados de hoje por equipe e coleta pinos do Mapa
+    const linhasGantt = cabecasAtivos.map(eq => {
+        const regsHoje = (registrosSalvos || []).filter(r => r.dataRegistro === hojeISO && r.equipe === eq.nome && r.projeto !== PROJETO_SOLIC_COMBUSTIVEL && r.projeto !== PROJETO_SOLIC_MATERIAL);
+        const tel = (telemetriaEquipes && telemetriaEquipes[eq.nome] && telemetriaEquipes[eq.nome].data === hojeISO) ? telemetriaEquipes[eq.nome] : null;
         const imp = regsHoje.find(r => r.desfecho === 'IMPREVISTO');
         const ativa = regsHoje.find(r => r.desfecho === 'EM ANDAMENTO');
-        const tel = (telemetriaEquipes && telemetriaEquipes[eq.nome] && telemetriaEquipes[eq.nome].data === hojeISO) ? telemetriaEquipes[eq.nome] : null;
 
-        let statusTexto = "Offline", statusHtml = `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold">⚪ Offline</span>`;
-        let detalhe = "Sem expediente hoje", corPino = "#64748b", noMapa = false;
+        // Fiscal do dia (o que foi apontado na atividade de hoje ou o padrão do cadastro)
+        const fiscalDia = (regsHoje[0]?.fiscalResponsavel || eq.fiscal || "DIOGO SAVIO").toUpperCase();
+        if (imp) indisp++;
 
-        if (imp) { indisp++; statusTexto = "INDISPONÍVEL"; statusHtml = `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] font-black">🔴 INDISPONÍVEL</span>`; detalhe = imp.motivoDesfecho; corPino = "#dc2626"; noMapa = true; }
-        else if (ativa) { statusTexto = "EM SITE"; statusHtml = `<span class="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-black">🔵 EM SITE</span>`; detalhe = `Site: ${ativa.imovel} (${ativa.projeto})`; corPino = "#2563eb"; noMapa = true; }
-        else if (tel && tel.statusTurno === 'DISPONIVEL') { statusTexto = "DISPONÍVEL"; statusHtml = `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-black">🟢 DISPONÍVEL</span>`; detalhe = `Em rota desde ${tel.horaInicio}`; corPino = "#059669"; noMapa = true; }
-
+        // Pino do mapa
         let lat = tel?.lat || null, lng = tel?.lng || null;
         if (!lat && ativa?.gpsEntrada?.includes(',')) { const p = ativa.gpsEntrada.split(',').map(Number); lat = p[0]; lng = p[1]; }
-        if (noMapa && lat && lng) pinos.push({ nome: eq.nome, lat, lng, cor: corPino, detalhe });
+        if (!lat && regsHoje[0]?.gpsEntrada?.includes(',')) { const p = regsHoje[0].gpsEntrada.split(',').map(Number); lat = p[0]; lng = p[1]; }
+        if (lat && lng) {
+            pinos.push({
+                tipo: normalizarSetor5G(eq.setor) === 'Fusão' ? 'FUSAO' : 'LANCAMENTO',
+                nome: eq.nome, site: ativa?.imovel || regsHoje[0]?.imovel || 'Em Rota',
+                fiscal: fiscalDia, lat, lng
+            });
+        }
 
-        // Filtros estilo Excel da aba Disponibilidade
-        if (filtrosColDisp.equipe && !`${eq.nome} ${eq.empresa} ${eq.fiscal}`.toLowerCase().includes(filtrosColDisp.equipe)) return;
-        if (filtrosColDisp.classe && !(eq.setor || "").toLowerCase().includes(filtrosColDisp.classe)) return;
-        if (filtrosColDisp.turno && !(tel?.horaInicio || "-").toLowerCase().includes(filtrosColDisp.turno)) return;
-        if (filtrosColDisp.status && !statusTexto.toLowerCase().includes(filtrosColDisp.status)) return;
-        if (filtrosColDisp.detalhe && !detalhe.toLowerCase().includes(filtrosColDisp.detalhe)) return;
+        return { eq, regsHoje, tel, imp, ativa, fiscalDia };
+    });
 
-        if (tbody) {
-            tbody.innerHTML += `<tr class="border-b text-xs"><td class="p-2.5"><div class="font-bold text-slate-800">${eq.nome}</div><div class="text-[9px] text-slate-500">${eq.empresa} • 👮 ${eq.fiscal}</div></td><td class="p-2.5">${obterBadgeSetorHtml(eq.setor)}</td><td class="p-2.5">${tel?.horaInicio || '-'}</td><td class="p-2.5">${statusHtml}</td><td class="p-2.5">${detalhe}</td><td class="p-2.5 font-mono text-[10px]">${lat ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : '-'}</td><td class="p-2.5">${lat ? `<button onclick="mudarSubAbaGestor('mapa')" class="bg-indigo-50 text-indigo-800 px-2 py-1 rounded text-[10px] font-bold">🗺️ Ver</button>` : '-'}</td></tr>`;
+    // Adiciona pinos dos Fiscais (Cor Vermelha) no Mapa
+    (FISCAIS_SISTEMA || []).forEach(f => {
+        const regsF = (registrosSalvos || []).filter(r => r.dataRegistro === hojeISO && r.equipe === f.nome);
+        const telF = (telemetriaEquipes && telemetriaEquipes[f.nome] && telemetriaEquipes[f.nome].data === hojeISO) ? telemetriaEquipes[f.nome] : null;
+        let lat = telF?.lat || null, lng = telF?.lng || null;
+        if (!lat && regsF[0]?.gpsEntrada?.includes(',')) { const p = regsF[0].gpsEntrada.split(',').map(Number); lat = p[0]; lng = p[1]; }
+        if (lat && lng) {
+            pinos.push({ tipo: 'FISCAL', nome: f.nome, site: regsF[0]?.imovel || 'Em Fiscalização', fiscal: 'DIOGO SAVIO', lat, lng });
         }
     });
 
@@ -316,6 +153,115 @@ function renderizarPainelDisponibilidadeEMapa() {
     setT('badge-aba-indisp', `${indisp} indisp.`);
     setT('badge-aba-mapa', `${pinos.length} no mapa`);
 
+    // Renderiza o Console de Alocação (Gantt) dentro de #subview-disponibilidade
+    const subDisp = document.getElementById('subview-disponibilidade');
+    if (subDisp) {
+        const listaFiscaisLateral = [
+            { id: "TODOS", label: "⭐ DIOGO SAVIO (TODAS AS EQUIPES)" },
+            ...(FISCAIS_SISTEMA || []).map(f => ({ id: f.nome, label: `👮 ${f.nome}` }))
+        ];
+
+        const linhasFiltradas = linhasGantt.filter(item => {
+            if (fiscalFiltroGantt === "TODOS") return true;
+            return item.fiscalDia === fiscalFiltroGantt.toUpperCase() || item.regsHoje.some(r => (r.fiscalResponsavel || "").toUpperCase() === fiscalFiltroGantt.toUpperCase());
+        });
+
+        const horasHeader = [];
+        for (let h = 7; h <= 20; h++) horasHeader.push(`<div class="flex-1 text-center text-[10px] font-bold text-slate-500 border-l border-slate-200">${String(h).padStart(2, '0')}h</div>`);
+
+        subDisp.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-800 text-white px-4 py-2.5 flex flex-wrap justify-between items-center gap-2">
+                    <div class="font-black text-sm">📊 Console de Alocação & Disponibilidade em Tempo Real (${hojeISO})</div>
+                    <div class="flex flex-wrap gap-2 text-[10px] font-bold">
+                        <span class="bg-red-200 text-red-900 px-2 py-0.5 rounded">🔴 Offline</span>
+                        <span class="bg-blue-500 text-white px-2 py-0.5 rounded">🔵 Em Andamento</span>
+                        <span class="bg-emerald-500 text-white px-2 py-0.5 rounded">🟢 Concluída</span>
+                        <span class="bg-orange-500 text-white px-2 py-0.5 rounded">🟠 Imprevisto</span>
+                        <span class="bg-fuchsia-500 text-white px-2 py-0.5 rounded">🟣 Almoço</span>
+                    </div>
+                </div>
+                <div class="flex flex-col md:flex-row min-h-[520px]">
+                    <!-- Painel Esquerdo: Fiscais (Diogo Savio em primeiro) -->
+                    <div class="w-full md:w-60 bg-slate-50 border-r border-slate-200 p-2 space-y-1 shrink-0">
+                        <div class="text-[10px] font-black text-slate-500 uppercase px-2 py-1">Filtrar por Fiscal / Gestor</div>
+                        ${listaFiscaisLateral.map(f => {
+                            const ativo = fiscalFiltroGantt === f.id;
+                            const qtd = f.id === "TODOS" ? linhasGantt.length : linhasGantt.filter(x => x.fiscalDia === f.id.toUpperCase()).length;
+                            return `<button onclick="fiscalFiltroGantt='${f.id}'; renderizarPainelDisponibilidadeEMapa();" class="w-full text-left px-2.5 py-2 rounded-lg text-[11px] font-bold flex justify-between items-center transition ${ativo ? 'bg-blue-700 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-blue-50 border border-slate-200'}"><span class="truncate">${f.label}</span><span class="text-[10px] px-1.5 rounded ${ativo ? 'bg-blue-900 text-white' : 'bg-slate-200 text-slate-700'}">${qtd}</span></button>`;
+                        }).join('')}
+                    </div>
+
+                    <!-- Painel Direito: Grade Gantt -->
+                    <div class="flex-1 overflow-x-auto">
+                        <div class="min-w-[820px]">
+                            <!-- Cabeçalho do Gantt -->
+                            <div class="flex border-b border-slate-300 bg-slate-100 items-center h-9">
+                                <div class="w-36 px-2 text-[10px] font-black text-slate-600 uppercase shrink-0">Fiscal / Resp.</div>
+                                <div class="w-60 px-2 text-[10px] font-black text-slate-600 uppercase border-l border-slate-200 shrink-0">Equipe & Classe</div>
+                                <div class="flex-1 flex relative h-full items-center">
+                                    ${horasHeader.join('')}
+                                    <div style="left:${pctAgora}%" class="absolute top-0 bottom-0 z-20 flex flex-col items-center pointer-events-none">
+                                        <span class="bg-red-600 text-white text-[9px] font-black px-1 rounded shadow">${horaAgoraStr}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Linhas das Equipes -->
+                            <div class="divide-y divide-slate-200">
+                                ${linhasFiltradas.map(item => {
+                                    const { eq, regsHoje, tel } = item;
+                                    const offline = regsHoje.length === 0 && !tel;
+                                    const corLinha = offline ? 'bg-red-50/90' : 'bg-white hover:bg-slate-50';
+
+                                    // Blocos de atividades no Gantt
+                                    let blocosHtml = '';
+                                    regsHoje.forEach(r => {
+                                        const mIni = horaParaMinutos(r.hEntrada);
+                                        if (mIni === null) return;
+                                        const mFim = (r.desfecho === 'EM ANDAMENTO' || r.hSaida === 'Em Andamento') ? Math.max(mIni + 30, minAgora) : (horaParaMinutos(r.hSaida) || mIni + 60);
+                                        const left = Math.max(0, ((mIni - inicioDiaMin) / totalDiaMin) * 100);
+                                        const width = Math.max(4, ((mFim - mIni) / totalDiaMin) * 100);
+
+                                        let bgBloco = 'bg-emerald-500 text-white';
+                                        if (r.desfecho === 'EM ANDAMENTO') bgBloco = 'bg-blue-500 text-white';
+                                        else if (r.desfecho === 'IMPREVISTO') bgBloco = 'bg-orange-500 text-white';
+
+                                        blocosHtml += `<div style="left:${left}%; width:${Math.min(100 - left, width)}%" title="${r.imovel} | ${r.anel} (${r.hEntrada} - ${r.hSaida})" class="absolute top-1 bottom-1 ${bgBloco} rounded px-1.5 flex items-center text-[9px] font-black truncate shadow-sm border border-black/10 z-10">${r.imovel} • ${r.anel || ''}</div>`;
+                                    });
+
+                                    // Bloco de Almoço (Fúcsia)
+                                    if (tel && tel.almocoInicio && tel.almocoFim) {
+                                        const aIni = horaParaMinutos(tel.almocoInicio), aFim = horaParaMinutos(tel.almocoFim);
+                                        if (aIni !== null && aFim !== null && aFim > aIni) {
+                                            const leftA = Math.max(0, ((aIni - inicioDiaMin) / totalDiaMin) * 100);
+                                            const widthA = Math.max(4, ((aFim - aIni) / totalDiaMin) * 100);
+                                            blocosHtml += `<div style="left:${leftA}%; width:${widthA}%" class="absolute top-1 bottom-1 bg-fuchsia-500 text-white rounded px-1 flex items-center justify-center text-[9px] font-black shadow z-15">Almoço</div>`;
+                                        }
+                                    }
+
+                                    return `
+                                    <div class="flex items-center h-11 ${corLinha}">
+                                        <div class="w-36 px-2 text-[10px] font-bold text-slate-700 truncate shrink-0">${item.fiscalDia}</div>
+                                        <div class="w-60 px-2 border-l border-slate-200 flex items-center justify-between gap-1 shrink-0">
+                                            <span class="text-[10px] font-black ${offline ? 'text-red-900' : 'text-slate-800'} truncate">${eq.nome}</span>
+                                            ${obterBadgeSetorHtml(eq.setor)}
+                                        </div>
+                                        <div class="flex-1 h-full relative flex">
+                                            ${horasHeader.map(() => `<div class="flex-1 border-l border-slate-100 h-full"></div>`).join('')}
+                                            <div style="left:${pctAgora}%" class="absolute top-0 bottom-0 w-0.5 bg-red-500/70 z-20 pointer-events-none"></div>
+                                            ${offline ? `<div class="absolute inset-y-2 left-2 px-2 bg-red-200/80 text-red-900 rounded text-[9px] font-bold flex items-center">Offline — Sem atividade iniciada</div>` : blocosHtml}
+                                        </div>
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    // Atualiza o Mapa Leaflet com ícones coloridos (Laranja=Lançamento, Azul=Fusão, Vermelho=Fiscal) + Rótulo acima
     const containerMapa = document.getElementById('mapa-rastreio-equipes');
     if (containerMapa && typeof L !== 'undefined') {
         if (!mapaRastreioInstancia) {
@@ -327,12 +273,153 @@ function renderizarPainelDisponibilidadeEMapa() {
         coordenadasPinosAtuais = [];
         pinos.forEach(p => {
             coordenadasPinosAtuais.push([p.lat, p.lng]);
-            L.marker([p.lat, p.lng]).bindPopup(`<b>👷 ${p.nome}</b><br>${p.detalhe}`).addTo(camadaMarcadoresRastreio);
+            const corHex = p.tipo === 'FISCAL' ? '#dc2626' : (p.tipo === 'FUSAO' ? '#2563eb' : '#ea580c');
+            const textoLabel = p.tipo === 'FISCAL' ? `👮 ${p.nome} / ${p.site}` : `${p.nome} / ${p.site} / ${p.fiscal}`;
+            const iconeCustom = L.divIcon({
+                className: 'custom-pin-5g',
+                html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
+                    <div style="background:white;color:#0f172a;border:2px solid ${corHex};border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.25);margin-bottom:2px;">${textoLabel}</div>
+                    <div style="width:16px;height:16px;border-radius:50%;background:${corHex};border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>
+                </div>`,
+                iconSize: [0, 0]
+            });
+            L.marker([p.lat, p.lng], { icon: iconeCustom }).addTo(camadaMarcadoresRastreio);
         });
     }
 }
 
-// ================= EXPORTAÇÃO INDIVIDUAL PARA EXCEL (COMBUSTÍVEL E MATERIAL) =================
+// ================= VALIDAÇÃO FISCAL (PRODUÇÃO EQUIPE & CONSUMO DE MATERIAL) =================
+async function validarAtividadeFiscal(id, tipo) {
+    const reg = (registrosSalvos || []).find(r => r.id === id);
+    if (!reg) return;
+    if (!usuarioPodeValidarFiscal(reg.fiscalResponsavel)) {
+        alert(`🔒 ACESSO RESTRITO!\n\nSomente o Fiscal apontado (${reg.fiscalResponsavel}) ou o Master podem validar este registro.`);
+        return;
+    }
+    const agora = new Date().toLocaleString('pt-BR');
+    const validador = usuarioObjetoLogado?.nome || usuarioLogado;
+    const tag = tipo === 'PROD' ? ` [VALID_PROD_POR: ${validador}] [VALID_PROD_EM: ${agora}]` : ` [VALID_MAT_POR: ${validador}] [VALID_MAT_EM: ${agora}]`;
+    const novaObs = (reg.obsBrutaOriginal || reg.observacoes || "") + tag;
+
+    await supabaseClient.from('registros_producao').update({ observacoes: novaObs }).eq('id', id);
+    await recarregarDadosGestor();
+    alert(`✅ ${tipo === 'PROD' ? 'Produção' : 'Consumo de Material'} validado com sucesso!`);
+}
+
+async function tratarMedicaoFinanceira5G(id) {
+    if (!usuarioPodeTratarFinanceiro()) {
+        alert("🔒 ACESSO RESTRITO!\n\nSomente Aline, Paula ou Master podem tratar a Medição Financeira.");
+        return;
+    }
+    const reg = (registrosSalvos || []).find(r => r.id === id);
+    if (!reg) return;
+    const agora = new Date().toLocaleString('pt-BR');
+    const tratador = usuarioObjetoLogado?.nome || usuarioLogado;
+    const novaObs = (reg.obsBrutaOriginal || reg.observacoes || "") + ` [TRAT_FIN_POR: ${tratador}] [TRAT_FIN_EM: ${agora}]`;
+    await supabaseClient.from('registros_producao').update({ observacoes: novaObs }).eq('id', id);
+    await recarregarDadosGestor();
+}
+
+function renderizarAbasValidacaoEMedicao(filtrados) {
+    const finalizados = (filtrados || []).filter(r => ['CONCLUIDA', 'CONCLUÍDA', 'PENDENTE', 'MALOGRADA'].includes((r.desfecho || '').toUpperCase()) && obterSetorDoProjeto(r.projeto) !== 'Fiscal');
+
+    // 1. ABA PRODUÇÃO EQUIPE
+    const cProd = document.getElementById('tabela-producao-equipe-corpo');
+    const pendProd = finalizados.filter(r => !r.validProdPor).length;
+    const bProd = document.getElementById('badge-aba-prod-pend'); if (bProd) bProd.innerText = `${pendProd} pend.`;
+    const cntProd = document.getElementById('contador-prod-equipe'); if (cntProd) cntProd.innerText = `${finalizados.length} registros`;
+
+    if (cProd) {
+        cProd.innerHTML = finalizados.map(r => {
+            const aging = r.validProdPor ? 0 : calcularAgingDias(r.dataRegistro);
+            const servs = Object.entries(r.itens5g?.maoObra || {}).map(([k, v]) => `<b>${k}</b>: ${v}`).join(' | ') || 'Sem itens';
+            return `<tr class="border-b text-xs">
+                <td class="p-3"><b>${r.imovel}</b> (${r.anel})<div class="text-[10px] text-slate-500">${r.dataRegistro}</div></td>
+                <td class="p-3 font-bold">${r.equipe}<div class="text-[10px] text-indigo-800">${r.empresa}</div></td>
+                <td class="p-3 text-[11px]">${servs}</td>
+                <td class="p-3 font-bold text-blue-900">👮 ${r.fiscalResponsavel}</td>
+                <td class="p-3 text-center"><span class="px-2 py-0.5 rounded font-black text-[10px] ${aging > 1 ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'}">${aging}d</span></td>
+                <td class="p-3">${r.validProdPor ? `<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">✅ Validado por ${r.validProdPor}</span>` : `<span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px]">⏳ Pendente Fiscal</span>`}</td>
+                <td class="p-3">${!r.validProdPor ? `<button onclick="validarAtividadeFiscal(${r.id}, 'PROD')" class="bg-blue-800 hover:bg-blue-900 text-white px-2.5 py-1 rounded text-[10px] font-bold">✅ Validar</button>` : 'OK'}</td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="7" class="p-6 text-center text-slate-400">Nenhuma produção finalizada.</td></tr>`;
+    }
+
+    // 2. ABA CONSUMO DE MATERIAL (REFORMULADA COM VALIDAÇÃO FISCAL + AGING)
+    const subMat = document.getElementById('subview-materiais');
+    if (subMat) {
+        subMat.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b bg-slate-50 flex justify-between items-center">
+                    <div><h3 class="font-black text-blue-950 text-sm">📦 Validação Fiscal — Consumo de Material por Equipe</h3><p class="text-[11px] text-slate-500">Valide os materiais consumidos para alimentar a Medição Financeira (Miscelâneas/Ferragens).</p></div>
+                    <span class="text-xs font-bold bg-indigo-100 text-indigo-900 px-3 py-1 rounded-full">${finalizados.length} registros</span>
+                </div>
+                <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                    <thead><tr class="bg-slate-100 text-slate-600 text-[11px] uppercase border-b"><th class="p-3">Data / Site</th><th class="p-3">Equipe</th><th class="p-3">Materiais Consumidos (SAP / AX / Fusão)</th><th class="p-3">Fiscal Apontado</th><th class="p-3 text-center">Aging</th><th class="p-3">Status</th><th class="p-3">Ação</th></tr></thead>
+                    <tbody>
+                        ${finalizados.map(r => {
+                            const aging = r.validMatPor ? 0 : calcularAgingDias(r.dataRegistro);
+                            const mSap = Object.entries(r.itens5g?.matSap || {}).map(([k, v]) => `<span class="text-emerald-800">SAP ${k}: ${v}</span>`);
+                            const mAx = Object.entries(r.itens5g?.matAx || {}).map(([k, v]) => `<span class="text-indigo-800">Cód ${k}: ${v}</span>`);
+                            const todosM = [...mSap, ...mAx].join(' | ') || 'Sem consumo';
+                            return `<tr class="border-b text-xs">
+                                <td class="p-3"><b>${r.imovel}</b><div class="text-[10px] text-slate-500">${r.dataRegistro}</div></td>
+                                <td class="p-3 font-bold">${r.equipe}</td>
+                                <td class="p-3 text-[11px]">${todosM}</td>
+                                <td class="p-3 font-bold text-blue-900">👮 ${r.fiscalResponsavel}</td>
+                                <td class="p-3 text-center"><span class="px-2 py-0.5 rounded font-black text-[10px] ${aging > 1 ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'}">${aging}d</span></td>
+                                <td class="p-3">${r.validMatPor ? `<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">✅ Validado por ${r.validMatPor}</span>` : `<span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px]">⏳ Pendente Fiscal</span>`}</td>
+                                <td class="p-3">${!r.validMatPor ? `<button onclick="validarAtividadeFiscal(${r.id}, 'MAT')" class="bg-indigo-800 hover:bg-indigo-900 text-white px-2.5 py-1 rounded text-[10px] font-bold">✅ Validar</button>` : 'OK'}</td>
+                            </tr>`;
+                        }).join('') || `<tr><td colspan="7" class="p-6 text-center text-slate-400">Sem consumos registrados.</td></tr>`}
+                    </tbody>
+                </table></div>
+            </div>`;
+    }
+
+    // 3. MEDIÇÃO FINANCEIRA (SOMENTE VALIDADOS — MISCELÂNEAS/FERRAGENS SEM CABO, FOSC E DGO — BOTÃO TRATAR ALINE/PAULA/MASTER)
+    if (!usuarioBloqueadoFinanceiro()) {
+        const validados = finalizados.filter(r => r.validProdPor || r.validMatPor);
+        const mapaPrecosMO = {};
+        Object.values(CATALOGO_MAO_DE_OBRA_5G).flat().forEach(i => mapaPrecosMO[i.codigo] = i);
+        const mapaMatAX = {};
+        CATALOGO_MATERIAIS_PROCISA_AX.forEach(m => mapaMatAX[m.codAx] = m);
+
+        let totalGeral = 0;
+        const cFin = document.getElementById('tabela-financeiro-corpo');
+        const theadFin = cFin?.closest('table')?.querySelector('thead tr');
+        if (theadFin) theadFin.innerHTML = `<th class="p-2.5">Data / Site</th><th class="p-2.5">Equipe / Empresa</th><th class="p-2.5">Fiscal Validador</th><th class="p-2.5">Miscelâneas/Ferragens (Sem Cabo/FOSC/DGO)</th><th class="p-2.5 text-right">Valor Medição</th><th class="p-2.5">Ação (Aline/Paula)</th>`;
+
+        if (cFin) {
+            cFin.innerHTML = validados.map(r => {
+                let valorLinha = 0;
+                Object.entries(r.itens5g?.maoObra || {}).forEach(([cod, q]) => {
+                    if (mapaPrecosMO[cod]) valorLinha += Number(q) * mapaPrecosMO[cod].precoCliente;
+                });
+                // Apenas materiais AX/Fusão (Exclui Cabo 22067771, FOSC 22068144 e DGO 22007782 que ficam em matSap)
+                const listaMisc = Object.entries(r.itens5g?.matAx || {}).map(([cod, q]) => {
+                    const m = mapaMatAX[cod];
+                    if (m && m.valor) valorLinha += Number(q) * m.valor;
+                    return `${m ? m.desc.substring(0, 22) : cod}: <b>${q}</b>`;
+                }).join(' | ') || 'Nenhum';
+
+                totalGeral += valorLinha;
+                return `<tr class="border-b text-xs">
+                    <td class="p-2.5"><b>${r.imovel}</b><div class="text-[10px] text-slate-500">${r.dataRegistro}</div></td>
+                    <td class="p-2.5 font-bold">${r.equipe}<div class="text-[10px] text-indigo-800">${r.empresa}</div></td>
+                    <td class="p-2.5 text-emerald-800 font-bold">👮 ${r.validProdPor || r.validMatPor}</td>
+                    <td class="p-2.5 text-[10px]">${listaMisc}</td>
+                    <td class="p-2.5 text-right font-black text-emerald-700">R$ ${valorLinha.toFixed(2)}</td>
+                    <td class="p-2.5">${r.tratFinPor ? `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">✅ Tratado (${r.tratFinPor})</span>` : `<button onclick="tratarMedicaoFinanceira5G(${r.id})" class="bg-emerald-600 text-white px-2.5 py-1 rounded text-[10px] font-bold">✅ Tratar</button>`}</td>
+                </tr>`;
+            }).join('') || `<tr><td colspan="6" class="p-6 text-center text-slate-400">Nenhuma produção validada pelos fiscais ainda.</td></tr>`;
+        }
+        const elTot = document.getElementById('fin-total-geral');
+        if (elTot) elTot.innerText = `R$ ${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    }
+}
+
+// ================= EXPORTAÇÃO INDIVIDUAL EXCEL (CADA ITEM EM SUA PRÓPRIA LINHA) =================
 function exportarSolicitacaoIndividualExcel(id, tipo) {
     const item = (registrosSalvos || []).find(r => r.id === id);
     if (!item) return;
@@ -341,8 +428,14 @@ function exportarSolicitacaoIndividualExcel(id, tipo) {
         html = `<table border="1"><tr><th>Data</th><th>Hora</th><th>Equipe</th><th>Placa / KM</th><th>Motivo</th><th>Status</th><th>GPS</th></tr>
                 <tr><td>${item.dataRegistro}</td><td>${item.hEntrada}</td><td>${item.equipe}</td><td>${item.imovel}</td><td>${item.motivoDesfecho}</td><td>${item.desfecho}</td><td>${item.gpsEntrada}</td></tr></table>`;
     } else {
-        html = `<table border="1"><tr><th>Data</th><th>Hora</th><th>Equipe</th><th>Itens Solicitados</th><th>Observações</th><th>Status</th></tr>
-                <tr><td>${item.dataRegistro}</td><td>${item.hEntrada}</td><td>${item.equipe}</td><td>${item.motivoDesfecho}</td><td>${item.observacoes}</td><td>${item.desfecho}</td></tr></table>`;
+        const listaItens = (item.motivoDesfecho || "").split('|').map(s => s.trim()).filter(Boolean);
+        const linhas = listaItens.map(linhaStr => {
+            const idx = linhaStr.lastIndexOf(':');
+            const nomeItem = idx !== -1 ? linhaStr.substring(0, idx).trim() : linhaStr;
+            const qtdItem = idx !== -1 ? linhaStr.substring(idx + 1).trim() : '1';
+            return `<tr><td>${item.dataRegistro}</td><td>${item.hEntrada}</td><td>${item.equipe}</td><td>${nomeItem}</td><td>${qtdItem}</td><td>${item.observacoes}</td><td>${item.desfecho}</td></tr>`;
+        }).join('');
+        html = `<table border="1"><tr><th>Data</th><th>Hora</th><th>Equipe</th><th>Item Solicitado</th><th>Quantidade</th><th>Observações</th><th>Status</th></tr>${linhas}</table>`;
     }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' }));
@@ -350,95 +443,14 @@ function exportarSolicitacaoIndividualExcel(id, tipo) {
     a.click();
 }
 
-// ================= IMPORTAR CARGA (PLANILHA) =================
-function abrirModalImportarPlanilha() {
-    let m = document.getElementById('modal-importar-planilha-5g');
-    if (!m) {
-        m = document.createElement('div');
-        m.id = 'modal-importar-planilha-5g';
-        m.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center p-4 z-50';
-        m.innerHTML = `
-            <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border">
-                <div class="bg-purple-800 text-white p-4 flex justify-between items-center"><h3 class="font-bold text-sm">📤 Importar Carga de Sites 5G</h3><button onclick="document.getElementById('modal-importar-planilha-5g').classList.add('hidden')" class="font-bold text-lg">✕</button></div>
-                <div class="p-4 space-y-3 text-xs">
-                    <div class="bg-purple-50 p-3 rounded-xl border border-purple-200 flex justify-between items-center">
-                        <span>Ordem: <b>ID_SITE;ANEL;ENDERECO;CLASSE;EQUIPE;EMPRESA;FISCAL;OBS</b></span>
-                        <button onclick="baixarModeloCSV5G()" class="bg-purple-700 text-white px-2.5 py-1.5 rounded-lg font-bold text-[10px]">⬇️ Modelo .CSV</button>
-                    </div>
-                    <textarea id="txt-carga-5g" rows="6" class="w-full border rounded-xl p-2 font-mono text-[11px]" placeholder="RJ-NDB-001;ANEL-01;Av Brasil 1000 - PENHA;LANÇAMENTO 5G;NICKSON WILLIAM VIANNA DOS SANTOS;PROCISA;FABIO BARBOSA;Lançar 500m"></textarea>
-                </div>
-                <div class="bg-slate-100 p-3 flex justify-end gap-2">
-                    <button onclick="document.getElementById('modal-importar-planilha-5g').classList.add('hidden')" class="bg-slate-300 px-3 py-2 rounded-lg text-xs font-bold">Cancelar</button>
-                    <button onclick="processarCarga5G()" class="bg-purple-700 text-white px-4 py-2 rounded-lg text-xs font-black">🚀 Enviar Carga</button>
-                </div>
-            </div>`;
-        document.body.appendChild(m);
-    }
-    m.classList.remove('hidden');
-}
-function baixarModeloCSV5G() {
-    const csv = "ID_SITE;ANEL;ENDERECO;CLASSE;EQUIPE;EMPRESA;FISCAL;OBS\nRJ-NDB-001;ANEL-01;Av Brasil 1000 - PENHA;LANÇAMENTO 5G;NICKSON WILLIAM VIANNA DOS SANTOS;PROCISA;FABIO BARBOSA;Lançar 500m\n";
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv' })); a.download = 'modelo_carga_5g.csv'; a.click();
-}
-async function processarCarga5G() {
-    const linhas = (document.getElementById('txt-carga-5g')?.value || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const novos = [];
-    linhas.forEach((l, i) => {
-        if (i === 0 && l.toUpperCase().startsWith("ID_SITE")) return;
-        const p = l.split(l.includes('\t') ? '\t' : ';').map(x => x.trim());
-        if (p.length < 5) return;
-        novos.push({
-            id: Date.now() + i, data_registro: obterDataLocalISO(), imovel: p[0].toUpperCase(), contato: p[1] || "ANEL-01",
-            projeto: normalizarNomeProjeto(p[3]), equipe: p[4].toUpperCase(), membros: p[4].toUpperCase(),
-            email: p[5] || "PROCISA", responsavel: p[6] || "FABIO BARBOSA",
-            h_entrada: "Programada", h_saida: "Aguardando", gps_entrada: "Carga Gestor", gps_saida: "-",
-            desfecho: "PROGRAMADA", motivo_desfecho: p[7] || "Carga Programada", malogros: [],
-            observacoes: `[END: ${p[2] || ''}] [EMPRESA: ${p[5] || 'PROCISA'}] [ANEL: ${p[1] || ''}] [FISCAL: ${p[6] || ''}] ${p[7] || ''}`.trim()
-        });
-    });
-    if (novos.length === 0) return;
-    await supabaseClient.from('registros_producao').insert(novos);
-    document.getElementById('modal-importar-planilha-5g')?.classList.add('hidden');
-    await recarregarDadosGestor();
-    alert(`✅ ${novos.length} Site(s) programados enviados!`);
-}
-
-// ================= SOLICITAÇÕES, FINANCEIRO E DASHBOARD PRINCIPAL =================
+// ================= TRATAR COMBUSTÍVEL / MATERIAL (SOMENTE LETÍCIA, BRUNA E MASTER) =================
 async function marcarSolicitacaoTratada5G(id) {
+    if (!usuarioPodeTratarSolicitacoes()) {
+        alert("🔒 ACESSO RESTRITO!\n\nSomente Letícia, Bruna ou Master podem tratar solicitações de Combustível e Material.");
+        return;
+    }
     await supabaseClient.from('registros_producao').update({ desfecho: "TRATADA", h_saida: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }).eq('id', id);
     await recarregarDadosGestor();
-}
-
-function renderizarTabelaFinanceiro5G(filtrados) {
-    if (usuarioBloqueadoFinanceiro()) return;
-    const concluidos = (filtrados || []).filter(r => r.desfecho === 'CONCLUIDA' || r.desfecho === 'CONCLUÍDA');
-    const todos = [
-        ...CATALOGO_MAO_DE_OBRA_5G["Lançamento"].map(i => ({ ...i, classe: "Lançamento" })),
-        ...CATALOGO_MAO_DE_OBRA_5G["Fusão"].map(i => ({ ...i, classe: "Fusão" })),
-        ...CATALOGO_MAO_DE_OBRA_5G["Obra"].map(i => ({ ...i, classe: "Obra" }))
-    ];
-    const acum = {};
-    todos.forEach(i => acum[i.codigo] = { ...i, qtdP: 0, qtdE: 0, rec: 0, cus: 0 });
-    concluidos.forEach(r => {
-        const ehProc = (r.empresa || "PROCISA").toUpperCase() === "PROCISA";
-        Object.entries(r.itens5g?.maoObra || {}).forEach(([cod, q]) => {
-            if (acum[cod] && Number(q) > 0) {
-                acum[cod].rec += Number(q) * acum[cod].precoCliente;
-                if (ehProc) acum[cod].qtdP += Number(q);
-                else { acum[cod].qtdE += Number(q); acum[cod].cus += Number(q) * acum[cod].precoParceiro; }
-            }
-        });
-    });
-    let totRec = 0;
-    const corpo = document.getElementById('tabela-financeiro-corpo');
-    if (corpo) {
-        corpo.innerHTML = Object.values(acum).map(i => {
-            totRec += i.rec;
-            return `<tr class="border-b text-xs"><td class="p-2.5 font-mono font-bold">${i.codigo}</td><td class="p-2.5"><span class="text-[9px] bg-slate-200 px-1 rounded">${i.classe}</span> <b>${i.desc}</b></td><td class="p-2.5 text-center">${i.un}</td><td class="p-2.5 text-center font-bold">${i.qtdP + i.qtdE}</td><td class="p-2.5 text-right">R$ ${i.precoCliente.toFixed(2)}</td><td class="p-2.5 text-right font-black text-emerald-700">R$ ${i.rec.toFixed(2)}</td></tr>`;
-        }).join('');
-    }
-    const elTot = document.getElementById('fin-total-geral');
-    if (elTot) elTot.innerText = `R$ ${totRec.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 }
 
 async function atualizarDashboardGestor() {
@@ -463,7 +475,6 @@ async function atualizarDashboardGestor() {
     listaSolicitacoesMaterialAtuais = base.filter(i => i.projeto === PROJETO_SOLIC_MATERIAL);
     listaImprevistosAtuais = base.filter(i => i.projeto === "IMPREVISTO / ATRASO" || i.desfecho === "IMPREVISTO");
 
-    // Aplica filtros principais + filtros estilo Excel por coluna
     const filtrados = base.filter(i => {
         if (i.projeto === PROJETO_SOLIC_COMBUSTIVEL || i.projeto === PROJETO_SOLIC_MATERIAL || i.projeto === "IMPREVISTO / ATRASO") return false;
         if (fPr && i.projeto !== fPr) return false;
@@ -491,52 +502,71 @@ async function atualizarDashboardGestor() {
     const cAtiv = document.getElementById('tabela-gestor-corpo');
     if (cAtiv) cAtiv.innerHTML = filtrados.map(i => `<tr class="border-b text-xs"><td class="p-3"><div class="font-black text-blue-950">📡 ${i.imovel}</div><div class="text-[10px] text-slate-500">📍 ${i.endereco || '-'} • ${i.dataRegistro}</div></td><td class="p-3"><div class="font-bold">${i.equipe}</div><span class="bg-indigo-100 text-indigo-950 px-1.5 rounded text-[9px] font-black">${i.empresa}</span><div class="text-[10px]">👮 ${i.fiscalResponsavel}</div></td><td class="p-3"><span class="bg-blue-100 text-blue-900 font-bold px-2 py-0.5 rounded text-[10px]">${i.projeto}</span><div class="text-[10px] font-bold mt-1">🔄 ${i.anel}</div></td><td class="p-3"><span class="font-bold px-2 py-1 rounded text-[10px] ${obterClasseCorDesfecho(i.desfecho)}">${i.desfecho}</span></td><td class="p-3 text-[11px]">🟢 ${i.hEntrada}<br>🔴 ${i.hSaida}</td><td class="p-3 font-mono text-[10px]">${i.gpsEntrada}</td><td class="p-3"><button onclick="excluirRegistro(${i.id}, '${i.imovel}')" class="bg-red-50 text-red-600 border px-2 py-1 rounded text-[10px] font-bold">🗑️</button></td></tr>`).join('') || `<tr><td colspan="7" class="p-6 text-center text-slate-400">Nenhum Site encontrado.</td></tr>`;
 
-    // Renderiza Combustível (com visualização das 2 fotos + Excel individual + Tratar)
+    // Renderiza Combustível (com Aging + 2 Fotos + Tratar Letícia/Bruna + Excel + Excluir Master)
     const cComb = document.getElementById('tabela-solic-combustivel-corpo');
     if (cComb) cComb.innerHTML = listaSolicitacoesCombustivelAtuais.map(i => {
-        const fotosHtml = (i.fotos && i.fotos.length > 0)
-            ? i.fotos.map((src, idx) => `<button onclick="abrirZoomFoto('${src}')" class="bg-indigo-100 text-indigo-900 border border-indigo-300 px-1.5 py-0.5 rounded text-[9px] font-bold mr-1">📷 ${idx === 0 ? 'Saldo' : 'Painel'}</button>`).join('')
-            : '<span class="text-slate-400 text-[10px]">Sem fotos</span>';
-        return `<tr class="border-b text-xs"><td class="p-3">${i.dataRegistro} ${i.hEntrada}</td><td class="p-3 font-bold">${i.equipe}</td><td class="p-3 font-black">${i.imovel}</td><td class="p-3">${i.motivoDesfecho}</td><td class="p-3 whitespace-nowrap">${fotosHtml}</td><td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${obterClasseCorDesfecho(i.desfecho)}">${i.desfecho}</span></td><td class="p-3 whitespace-nowrap space-x-1">${i.desfecho !== 'TRATADA' ? `<button onclick="marcarSolicitacaoTratada5G(${i.id})" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">✅ Tratar</button>` : '<span class="text-emerald-700 font-bold text-[10px]">OK</span>'} <button onclick="exportarSolicitacaoIndividualExcel(${i.id}, 'combustivel')" class="bg-blue-800 text-white px-2 py-1 rounded text-[10px] font-bold">📥 Excel</button></td></tr>`;
+        const aging = i.desfecho === 'TRATADA' ? 0 : calcularAgingDias(i.dataRegistro);
+        const fotosHtml = (i.fotos && i.fotos.length > 0) ? i.fotos.map((src, idx) => `<button onclick="abrirZoomFoto('${src}')" class="bg-indigo-100 text-indigo-900 border px-1.5 py-0.5 rounded text-[9px] font-bold mr-1">📷 ${idx === 0 ? 'Saldo' : 'Painel'}</button>`).join('') : '-';
+        return `<tr class="border-b text-xs"><td class="p-3">${i.dataRegistro} ${i.hEntrada}<div class="text-[10px] font-black text-red-700">Aging: ${aging}d</div></td><td class="p-3 font-bold">${i.equipe}</td><td class="p-3 font-black">${i.imovel}</td><td class="p-3">${i.motivoDesfecho}</td><td class="p-3 whitespace-nowrap">${fotosHtml}</td><td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${obterClasseCorDesfecho(i.desfecho)}">${i.desfecho}</span></td><td class="p-3 whitespace-nowrap space-x-1">${i.desfecho !== 'TRATADA' ? `<button onclick="marcarSolicitacaoTratada5G(${i.id})" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">✅ Tratar</button>` : '<span class="text-emerald-700 font-bold text-[10px]">OK</span>'} <button onclick="exportarSolicitacaoIndividualExcel(${i.id}, 'combustivel')" class="bg-blue-800 text-white px-2 py-1 rounded text-[10px] font-bold">📥 Excel</button> <button onclick="excluirRegistro(${i.id}, 'Combustível')" class="bg-red-50 text-red-600 border px-1.5 py-1 rounded text-[10px]">🗑️</button></td></tr>`;
     }).join('') || `<tr><td colspan="7" class="p-4 text-center text-slate-400">Sem solicitações.</td></tr>`;
 
-    // Renderiza Solicitação de Material (com Excel individual + Tratar)
+    // Renderiza Solicitação de Material (com Aging + Tratar Letícia/Bruna + Excel linha a linha + Excluir Master)
     const cMat = document.getElementById('tabela-solic-material-corpo');
-    if (cMat) cMat.innerHTML = listaSolicitacoesMaterialAtuais.map(i => `<tr class="border-b text-xs"><td class="p-3">${i.dataRegistro} ${i.hEntrada}</td><td class="p-3 font-bold">${i.equipe}</td><td class="p-3 font-bold">${i.motivoDesfecho}</td><td class="p-3">${i.observacoes}</td><td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${obterClasseCorDesfecho(i.desfecho)}">${i.desfecho}</span></td><td class="p-3 whitespace-nowrap space-x-1">${i.desfecho !== 'TRATADA' ? `<button onclick="marcarSolicitacaoTratada5G(${i.id})" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">✅ Tratar</button>` : '<span class="text-emerald-700 font-bold text-[10px]">OK</span>'} <button onclick="exportarSolicitacaoIndividualExcel(${i.id}, 'material')" class="bg-blue-800 text-white px-2 py-1 rounded text-[10px] font-bold">📥 Excel</button></td></tr>`).join('') || `<tr><td colspan="6" class="p-4 text-center text-slate-400">Sem pedidos.</td></tr>`;
+    if (cMat) cMat.innerHTML = listaSolicitacoesMaterialAtuais.map(i => {
+        const aging = i.desfecho === 'TRATADA' ? 0 : calcularAgingDias(i.dataRegistro);
+        return `<tr class="border-b text-xs"><td class="p-3">${i.dataRegistro} ${i.hEntrada}<div class="text-[10px] font-black text-red-700">Aging: ${aging}d</div></td><td class="p-3 font-bold">${i.equipe}</td><td class="p-3 font-bold">${i.motivoDesfecho}</td><td class="p-3">${i.observacoes}</td><td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${obterClasseCorDesfecho(i.desfecho)}">${i.desfecho}</span></td><td class="p-3 whitespace-nowrap space-x-1">${i.desfecho !== 'TRATADA' ? `<button onclick="marcarSolicitacaoTratada5G(${i.id})" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">✅ Tratar</button>` : '<span class="text-emerald-700 font-bold text-[10px]">OK</span>'} <button onclick="exportarSolicitacaoIndividualExcel(${i.id}, 'material')" class="bg-blue-800 text-white px-2 py-1 rounded text-[10px] font-bold">📥 Excel</button> <button onclick="excluirRegistro(${i.id}, 'Solic. Material')" class="bg-red-50 text-red-600 border px-1.5 py-1 rounded text-[10px]">🗑️</button></td></tr>`;
+    }).join('') || `<tr><td colspan="6" class="p-4 text-center text-slate-400">Sem pedidos.</td></tr>`;
 
     // Renderiza Imprevistos
     const cImp = document.getElementById('tabela-imprevistos-corpo');
     if (cImp) cImp.innerHTML = listaImprevistosAtuais.map(i => `<tr class="border-b text-xs"><td class="p-3">${i.dataRegistro} ${i.hEntrada}</td><td class="p-3 font-bold">${i.equipe}</td><td class="p-3">${i.motivoDesfecho}</td><td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${obterClasseCorDesfecho(i.desfecho)}">${i.desfecho}</span></td><td class="p-3">${i.observacoes}</td><td class="p-3 font-mono text-[10px]">${i.gpsEntrada}</td><td class="p-3"><button onclick="excluirRegistro(${i.id}, 'Imprevisto')" class="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px]">🗑️</button></td></tr>`).join('') || `<tr><td colspan="7" class="p-4 text-center text-slate-400">Sem imprevistos.</td></tr>`;
 
     renderizarPainelDisponibilidadeEMapa();
-    renderizarTabelaFinanceiro5G(filtrados);
-    setT('card-vist-consolidado', filtrados.filter(r => obterSetorDoProjeto(r.projeto) === "Lançamento" && r.desfecho === "CONCLUIDA").length);
-    setT('card-inst-consolidado', filtrados.filter(r => obterSetorDoProjeto(r.projeto) === "Fusão" && r.desfecho === "CONCLUIDA").length);
-    setT('card-ativ-consolidado', filtrados.filter(r => obterSetorDoProjeto(r.projeto) === "Obra" && r.desfecho === "CONCLUIDA").length);
+    renderizarAbasValidacaoEMedicao(filtrados);
 }
 
-// EXCLUSÃO RESTRITA SOMENTE AO MASTER
+// ================= EQUIPES, EXCLUSÕES (MASTER) E NAVEGAÇÃO =================
+async function importarBase24Cabecas5G() {
+    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("importar a base oficial de equipes"); return; }
+    if (!confirm("📥 Carregar os 24 Cabeças de Equipe oficiais?")) return;
+    equipesSistema = JSON.parse(JSON.stringify(BASE_CABECAS_EQUIPE_5G));
+    await sincronizarEquipesNaNuvem();
+    popularSelectEquipes();
+    renderizarTabelaEquipes();
+}
+function alternarTodosCheckboxesEquipes(m) { document.querySelectorAll('.chk-equipe-lote').forEach(c => c.checked = m.checked); }
+async function excluirEquipesSelecionadasEmLote() {
+    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("excluir equipes"); return; }
+    const ids = Array.from(document.querySelectorAll('.chk-equipe-lote:checked')).map(c => Number(c.value));
+    if (ids.length === 0 || !confirm(`Excluir ${ids.length} equipe(s)?`)) return;
+    equipesSistema = equipesSistema.filter(e => !ids.includes(Number(e.id)));
+    await sincronizarEquipesNaNuvem();
+    popularSelectEquipes();
+    renderizarTabelaEquipes();
+}
+function renderizarTabelaEquipes() {
+    inicializarCustomizacoesVisuais5GGestor();
+    const corpo = document.getElementById('tabela-equipes-corpo');
+    if (!corpo) return;
+    const th = corpo.closest('table')?.querySelector('thead tr');
+    if (th) th.innerHTML = `<th class="p-3 w-8"><input type="checkbox" onclick="alternarTodosCheckboxesEquipes(this)"></th><th class="p-3">Equipe / PIN</th><th class="p-3">Empresa / Função</th><th class="p-3">RG / CPF</th><th class="p-3">Classe</th><th class="p-3">Fiscal / Região</th><th class="p-3">Ações</th>`;
+    corpo.innerHTML = (equipesSistema || []).map(eq => `<tr class="border-b text-xs"><td class="p-3"><input type="checkbox" value="${eq.id}" class="chk-equipe-lote"></td><td class="p-3 font-black">${eq.nome} <span class="text-[10px] font-mono bg-amber-50 px-1 rounded">🔑 ${eq.pin || '1234'}</span></td><td class="p-3">${eq.empresa}<div class="text-[10px] text-slate-500">${eq.funcao || '-'}</div></td><td class="p-3 text-[10px]">${eq.rg || '-'} / ${eq.cpf || '-'}</td><td class="p-3">${obterBadgeSetorHtml(eq.setor)}</td><td class="p-3 text-[10px]">👮 ${eq.fiscal}<br>📍 ${eq.areaAtuacao || '-'}</td><td class="p-3"><button onclick="excluirEquipe(${eq.id}, '${eq.nome}')" class="bg-red-50 text-red-600 border px-2 py-1 rounded text-[10px]">🗑️</button></td></tr>`).join('');
+}
+async function excluirEquipe(id, nome) {
+    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("excluir equipes"); return; }
+    if (confirm(`Excluir "${nome}"?`)) { equipesSistema = equipesSistema.filter(e => e.id !== id); await sincronizarEquipesNaNuvem(); renderizarTabelaEquipes(); popularSelectEquipes(); }
+}
 async function excluirRegistro(id, s) {
-    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("excluir qualquer registro ou informação"); return; }
-    if (confirm(`Excluir "${s}"?`)) {
-        await supabaseClient.from('registros_producao').delete().eq('id', id);
-        registrosSalvos = registrosSalvos.filter(r => r.id !== id);
-        atualizarDashboardGestor();
-    }
+    if (!usuarioEhMaster()) { exibirAvisoSomenteMaster("excluir qualquer registro ou solicitação"); return; }
+    if (confirm(`Excluir "${s}"?`)) { await supabaseClient.from('registros_producao').delete().eq('id', id); registrosSalvos = registrosSalvos.filter(r => r.id !== id); atualizarDashboardGestor(); }
 }
 
-// NAVEGAÇÃO COM BLOQUEIO DE BONIFICAÇÃO (SOMENTE MASTER) E FINANCEIRO (BLOQUEIO CP DOCUMENTACAO / CP CONSTRUCAO)
 function mudarSubAbaGestor(aba) {
-    if (aba === 'bonificacao' && !usuarioEhMaster()) {
-        exibirAvisoSomenteMaster("acessar a aba de Bonificação");
-        return;
-    }
-    if (aba === 'financeiro' && usuarioBloqueadoFinanceiro()) {
-        alert("🔒 ACESSO RESTRITO!\n\nA área Financeira (Medição Cliente e Pagamento Parceiros) é restrita para o perfil " + (usuarioObjetoLogado?.cargo || "atual") + ".");
-        return;
-    }
+    if (aba === 'bonificacao' && !usuarioEhMaster()) { exibirAvisoSomenteMaster("acessar a aba de Bonificação"); return; }
+    if (aba === 'financeiro' && usuarioBloqueadoFinanceiro()) { alert("🔒 ACESSO RESTRITO!\n\nA área Financeira é liberada apenas para Aline (CP DOCUMENTACAO), Paula (CP CONSTRUCAO) e Master."); return; }
 
-    ['atividades', 'disponibilidade', 'mapa', 'combustivel', 'solicitacao_material', 'graficos', 'imprevistos', 'materiais', 'financeiro', 'equipes', 'opcoes', 'usuarios', 'bonificacao', 'auditoria'].forEach(s => {
+    inicializarCustomizacoesVisuais5GGestor();
+    ['disponibilidade', 'atividades', 'graficos', 'mapa', 'producao_equipe', 'materiais', 'combustivel', 'solicitacao_material', 'imprevistos', 'financeiro', 'equipes', 'opcoes', 'usuarios', 'bonificacao', 'auditoria'].forEach(s => {
         document.getElementById(`subview-${s}`)?.classList.add('hidden');
         const b = document.getElementById(`subtab-btn-${s}`);
         if (b) b.className = "px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1";
@@ -544,12 +574,13 @@ function mudarSubAbaGestor(aba) {
     document.getElementById(`subview-${aba}`)?.classList.remove('hidden');
     const tb = document.getElementById(`subtab-btn-${aba}`);
     if (tb) tb.className = "px-2.5 py-1 text-[11px] font-bold rounded-lg transition bg-blue-900 text-white shadow-sm flex items-center gap-1";
+
     if (aba === 'equipes') renderizarTabelaEquipes();
     if (aba === 'mapa') {
         renderizarPainelDisponibilidadeEMapa();
         setTimeout(() => { if (mapaRastreioInstancia) { mapaRastreioInstancia.invalidateSize(); if (coordenadasPinosAtuais.length > 0) mapaRastreioInstancia.fitBounds(L.latLngBounds(coordenadasPinosAtuais), { padding: [40, 40], maxZoom: 15 }); } }, 250);
     }
-    if (['atividades', 'disponibilidade', 'combustivel', 'solicitacao_material', 'imprevistos', 'financeiro', 'graficos'].includes(aba)) atualizarDashboardGestor();
+    if (['disponibilidade', 'atividades', 'producao_equipe', 'materiais', 'combustivel', 'solicitacao_material', 'imprevistos', 'financeiro', 'graficos'].includes(aba)) atualizarDashboardGestor();
 }
 
 function aplicarAtalhoPeriodo(tipo) {
@@ -557,9 +588,8 @@ function aplicarAtalhoPeriodo(tipo) {
     if (tipo === 'hoje') { const s = obterDataLocalISO(); i1.value = s; i2.value = s; } else { i1.value = ''; i2.value = ''; }
     atualizarDashboardGestor();
 }
-
 function exportarExcelFinanceiro() {
-    if (usuarioBloqueadoFinanceiro()) { alert("🔒 Acesso restrito à área financeira."); return; }
+    if (usuarioBloqueadoFinanceiro()) { alert("🔒 Acesso restrito."); return; }
     const t = document.querySelector('#subview-financeiro table')?.outerHTML || "";
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + t], { type: 'application/vnd.ms-excel' })); a.download = `Medicao_5G_Procisa_${obterDataLocalISO()}.xls`; a.click();
 }

@@ -1,5 +1,7 @@
-// ================= CAMPO.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V3) =================
+// ================= CAMPO.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V4) =================
 let salvandoAtendimentoTrava = false;
+let enviandoMaterialTrava = false;
+let enviandoCombustivelTrava = false;
 let fotosSolicCombustivelTemp = { saldo: null, painel: null };
 
 function inicializarCamposExtras5GCampo() {
@@ -10,7 +12,7 @@ function inicializarCamposExtras5GCampo() {
         box5G.id = 'box-campos-5g-abertura';
         box5G.className = 'space-y-2.5 pt-1';
         box5G.innerHTML = `
-            <div class="bg-blue-50/80 p-2.5 rounded-xl border border-blue-200 space-y-2">
+            <div id="box-empresa-executante-campo" class="bg-blue-50/80 p-2.5 rounded-xl border border-blue-200 space-y-2">
                 <label class="block text-[11px] font-black text-blue-950 uppercase">🏢 Empresa Executante *</label>
                 <div class="grid grid-cols-2 gap-1.5">
                     <button type="button" id="btn-emp-procisa" onclick="selecionarTipoEmpresaCampo('PROCISA')" class="py-2 px-2 rounded-lg font-black text-xs bg-blue-900 text-white shadow-sm">🟦 PROCISA (Própria)</button>
@@ -18,13 +20,18 @@ function inicializarCamposExtras5GCampo() {
                 </div>
                 <select id="sel-empresa-campo" onchange="dadosAtendimento.empresaSelecionada=this.value" class="w-full text-xs font-bold border border-blue-300 rounded-lg p-2 bg-white text-blue-950 hidden"></select>
             </div>
+            <div id="box-equipe-fiscalizada-campo" class="bg-red-50/80 p-2.5 rounded-xl border border-red-200 space-y-1.5 hidden">
+                <label class="block text-[11px] font-black text-red-950 uppercase">👷 Equipe Fiscalizada *</label>
+                <select id="sel-equipe-fiscalizada" onchange="aoSelecionarEquipeFiscalizada(this.value)" class="w-full text-xs font-bold border border-red-300 rounded-lg p-2 bg-white text-slate-800"></select>
+                <div id="lbl-tipo-equipe-fiscalizada" class="text-[11px] font-black text-blue-900"></div>
+            </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">🔄 ANEL *</label>
                     <input type="text" id="inp-anel-campo" placeholder="Ex: ANEL-01" class="w-full text-xs font-bold uppercase border border-slate-300 rounded-lg p-2.5 outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">👮 Fiscal Responsável *</label>
+                    <label id="lbl-fiscal-ou-gestor" class="block text-xs font-semibold text-slate-600 mb-1">👮 Fiscal Responsável *</label>
                     <select id="sel-fiscal-campo" class="w-full text-xs font-bold border border-slate-300 rounded-lg p-2.5 bg-white text-slate-800 outline-none"></select>
                 </div>
             </div>`;
@@ -37,7 +44,27 @@ function popularSelectEmpresasEFiscaisCampo() {
     const selEmp = document.getElementById('sel-empresa-campo');
     if (selEmp) selEmp.innerHTML = (PARCEIROS_SISTEMA || []).filter(p => p.nome !== "PROCISA").map(p => `<option value="${p.nome}">🏢 ${p.nome}</option>`).join('');
     const selFisc = document.getElementById('sel-fiscal-campo');
-    if (selFisc) selFisc.innerHTML = (FISCAIS_SISTEMA || []).map(f => `<option value="${f.nome}">👮 ${f.nome} (${f.regiao})</option>`).join('');
+    if (selFisc && !dadosAtendimento.ehFiscal) {
+        selFisc.innerHTML = (FISCAIS_SISTEMA || []).map(f => `<option value="${f.nome}">👮 ${f.nome} (${f.regiao})</option>`).join('');
+    }
+    const selEqF = document.getElementById('sel-equipe-fiscalizada');
+    if (selEqF) {
+        const cabecas = (equipesSistema || []).filter(e => e.status === "Ativo" && ehCabecaDeEquipe(e));
+        selEqF.innerHTML = '<option value="">Selecione a equipe fiscalizada...</option>' +
+            cabecas.map(e => `<option value="${e.nome}">${e.nome} (${e.setor} • ${e.empresa})</option>`).join('');
+    }
+}
+
+function aoSelecionarEquipeFiscalizada(nomeEq) {
+    const eq = (equipesSistema || []).find(e => e.nome === nomeEq);
+    const lbl = document.getElementById('lbl-tipo-equipe-fiscalizada');
+    if (!eq || !lbl) return;
+    const ehProcisa = (eq.empresa || "PROCISA").toUpperCase() === "PROCISA";
+    dadosAtendimento.empresaSelecionada = eq.empresa || "PROCISA";
+    dadosAtendimento.equipeFiscalizada = eq.nome;
+    lbl.innerHTML = ehProcisa
+        ? `<span class="bg-blue-900 text-white px-2 py-0.5 rounded">🟦 EQUIPE PRÓPRIA: PROCISA</span>`
+        : `<span class="bg-orange-600 text-white px-2 py-0.5 rounded">🟧 EQUIPE PARCEIRA: ${eq.empresa}</span>`;
 }
 
 function selecionarTipoEmpresaCampo(tipo) {
@@ -60,38 +87,67 @@ function aoSelecionarEquipeCampo() {
     const eq = selEq ? selEq.value : "";
     if (!eq) { equipeAutenticadaSessao = ""; sessionStorage.removeItem('gpd5g_equipe_autenticada_pin'); atualizarBarraSegurancaPinCampo(); return; }
 
+    const ehFiscal = ehPerfilFiscalCampo(eq);
+    dadosAtendimento.ehFiscal = ehFiscal;
+
     const eqObj = (equipesSistema || []).find(e => e.nome === eq);
-    const pinCorreto = obterPinDaEquipe(eqObj);
+    const fiscObj = (FISCAIS_SISTEMA || []).find(f => f.nome === eq);
+    const pinCorreto = ehFiscal ? (fiscObj?.matricula || "1234") : obterPinDaEquipe(eqObj);
+
     if (equipeAutenticadaSessao !== eq) {
-        const pin = prompt(`🔒 PIN de 4 dígitos para ${eq} (Padrão: 1234):`);
-        if (!pin || pin.trim() !== pinCorreto) { alert("❌ PIN incorreto!"); selEq.value = ""; return; }
+        const pin = prompt(ehFiscal ? `🔒 Digite sua matrícula de Fiscal para ${eq}:` : `🔒 PIN de 4 dígitos para ${eq} (Padrão: 1234):`);
+        if (!pin || pin.trim() !== pinCorreto) { alert("❌ PIN / Matrícula incorreto!"); selEq.value = ""; return; }
         equipeAutenticadaSessao = eq;
         sessionStorage.setItem('gpd5g_equipe_autenticada_pin', eq);
     }
 
     document.getElementById('current-user-team').innerText = eq;
-    if (eqObj) {
-        if (eqObj.empresa && eqObj.empresa !== "PROCISA") {
-            selecionarTipoEmpresaCampo('PARCEIRA');
-            const selEmp = document.getElementById('sel-empresa-campo');
-            if (selEmp) selEmp.value = eqObj.empresa;
-            dadosAtendimento.empresaSelecionada = eqObj.empresa;
-        } else selecionarTipoEmpresaCampo('PROCISA');
 
-        if (eqObj.fiscal) {
-            const selFisc = document.getElementById('sel-fiscal-campo');
-            if (selFisc) selFisc.value = eqObj.fiscal;
+    // Ajustes específicos para Perfil Fiscal vs Equipe
+    const boxEmp = document.getElementById('box-empresa-executante-campo');
+    const boxEqFisc = document.getElementById('box-equipe-fiscalizada-campo');
+    const lblFiscGestor = document.getElementById('lbl-fiscal-ou-gestor');
+    const selFisc = document.getElementById('sel-fiscal-campo');
+    const btnCheckin = document.querySelector('button[onclick="fazerCheckIn()"]');
+
+    if (ehFiscal) {
+        boxEmp?.classList.add('hidden');
+        boxEqFisc?.classList.remove('hidden');
+        if (lblFiscGestor) lblFiscGestor.innerText = "👔 Gestor Responsável *";
+        if (selFisc) selFisc.innerHTML = `<option value="DIOGO SAVIO">👔 DIOGO SAVIO</option>`;
+        if (btnCheckin) btnCheckin.innerHTML = "📍 Iniciar Fiscalização no Site";
+        atualizarProjetosPermitidosCampo(eq, true);
+    } else {
+        boxEmp?.classList.remove('hidden');
+        boxEqFisc?.classList.add('hidden');
+        if (lblFiscGestor) lblFiscGestor.innerText = "👮 Fiscal Responsável *";
+        if (selFisc) selFisc.innerHTML = (FISCAIS_SISTEMA || []).map(f => `<option value="${f.nome}">👮 ${f.nome} (${f.regiao})</option>`).join('');
+        if (btnCheckin) btnCheckin.innerHTML = "📍 Iniciar Atividade no Site";
+        if (eqObj) {
+            if (eqObj.empresa && eqObj.empresa !== "PROCISA") {
+                selecionarTipoEmpresaCampo('PARCEIRA');
+                const selEmp = document.getElementById('sel-empresa-campo');
+                if (selEmp) selEmp.value = eqObj.empresa;
+                dadosAtendimento.empresaSelecionada = eqObj.empresa;
+            } else selecionarTipoEmpresaCampo('PROCISA');
+            if (eqObj.fiscal && selFisc) selFisc.value = eqObj.fiscal;
         }
+        atualizarProjetosPermitidosCampo(eq, false);
     }
-    atualizarProjetosPermitidosCampo(eq);
+
     atualizarBarraSegurancaPinCampo();
     document.getElementById('box-controle-expediente-campo')?.classList.remove('hidden');
 }
 
-function atualizarProjetosPermitidosCampo(nomeEquipe) {
+function atualizarProjetosPermitidosCampo(nomeEquipe, ehFiscal = false) {
     const selProj = document.getElementById('sel-projeto');
     const badge = document.getElementById('badge-setor-campo');
     if (!selProj) return;
+    if (ehFiscal) {
+        if (badge) badge.innerText = "Classe: Fiscalização";
+        selProj.innerHTML = `<option value="FISCALIZAÇÃO LANÇAMENTO">FISCALIZAÇÃO LANÇAMENTO</option><option value="FISCALIZAÇÃO FUSÃO">FISCALIZAÇÃO FUSÃO</option>`;
+        return;
+    }
     const eqObj = (equipesSistema || []).find(e => e.nome === nomeEquipe);
     const setores = obterArraySetores(eqObj ? eqObj.setor : "Lançamento");
     if (badge) badge.innerText = `Classe: ${setores.join(' + ')}`;
@@ -100,20 +156,11 @@ function atualizarProjetosPermitidosCampo(nomeEquipe) {
 
 function desbloquearTrocaEquipeCampo() {
     equipeAutenticadaSessao = "";
+    dadosAtendimento.ehFiscal = false;
     sessionStorage.removeItem('gpd5g_equipe_autenticada_pin');
     const s = document.getElementById('sel-equipe');
     if (s) { s.disabled = false; s.value = ""; }
     atualizarBarraSegurancaPinCampo();
-}
-
-async function alterarPinPeloTecnicoCampo() {
-    const eq = (equipesSistema || []).find(e => e.nome === document.getElementById('sel-equipe')?.value);
-    if (!eq) return;
-    const n = prompt("🔑 Novo PIN (4 números):", eq.pin || "1234")?.trim();
-    if (!n || !/^\d{4}$/.test(n)) return;
-    eq.pin = n;
-    await sincronizarEquipesNaNuvem();
-    alert("✅ PIN atualizado!");
 }
 
 function capturarGpsReal(timeout = 8000) {
@@ -148,6 +195,20 @@ function comprimirImagemBase64Campo(arquivo, larguraMaxima = 720, qualidade = 0.
     });
 }
 
+async function registrarPausaAlmocoCampo() {
+    if (!equipeAutenticadaSessao) return;
+    const inicio = prompt("🍽️ Horário de INÍCIO do Almoço (Ex: 12:00):", "12:00");
+    if (!inicio) return;
+    const fim = prompt("🍽️ Horário de RETORNO do Almoço (Ex: 13:00):", "13:00");
+    if (!fim) return;
+    const hoje = obterDataLocalISO();
+    await sincronizarTelemetriaNaNuvem(equipeAutenticadaSessao, {
+        ...(telemetriaEquipes[equipeAutenticadaSessao] || {}),
+        equipe: equipeAutenticadaSessao, data: hoje, almocoInicio: inicio.trim(), almocoFim: fim.trim()
+    });
+    alert(`🍽️ Pausa de Almoço (${inicio} às ${fim}) registrada no Console de Disponibilidade!`);
+}
+
 async function iniciarExpedienteRastreioCampo() {
     const nomeEq = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     if (!nomeEq) return;
@@ -175,7 +236,7 @@ async function encerrarExpedienteRastreioCampo() {
     document.getElementById('btn-encerrar-expediente-campo')?.classList.add('hidden');
 }
 
-// ================= CHECK-IN NO SITE (SEPARAÇÃO ESTRITA LANÇAMENTO vs FUSÃO) =================
+// ================= CHECK-IN NO SITE (EQUIPE OU FISCAL) =================
 async function fazerCheckIn() {
     const equipe = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     const projeto = document.getElementById('sel-projeto')?.value;
@@ -183,8 +244,10 @@ async function fazerCheckIn() {
     const anel = document.getElementById('inp-anel-campo')?.value.trim().toUpperCase() || "ANEL-01";
     const fiscal = document.getElementById('sel-fiscal-campo')?.value || "DIEGO ALVES";
     const empresa = dadosAtendimento.empresaSelecionada || "PROCISA";
+    const ehFiscal = dadosAtendimento.ehFiscal;
 
-    if (!equipe || !projeto || !idSite) { alert("⚠️ Selecione o Cabeça de Equipe, a Classe 5G e informe o ID SITE!"); return; }
+    if (!equipe || !projeto || !idSite) { alert("⚠️ Preencha Equipe/Fiscal, Classe e ID SITE!"); return; }
+    if (ehFiscal && !dadosAtendimento.equipeFiscalizada) { alert("⚠️ Selecione qual equipe você está fiscalizando!"); return; }
 
     const coordReal = await capturarGpsReal();
     const [lat, lng] = coordReal.split(',').map(s => parseFloat(s.trim()));
@@ -197,14 +260,15 @@ async function fazerCheckIn() {
         horaInicio: telemetriaEquipes[equipe]?.horaInicio || horaEntrada, lat, lng, horaUltimoSinal: horaEntrada
     });
 
-    dadosAtendimento = { idEmAndamento: idTemp, hEntrada: horaEntrada, gpsEntrada: coordReal, idSite, anel, fiscalResponsavel: fiscal, empresaSelecionada: empresa };
+    dadosAtendimento = { ...dadosAtendimento, idEmAndamento: idTemp, hEntrada: horaEntrada, gpsEntrada: coordReal, idSite, anel, fiscalResponsavel: fiscal, empresaSelecionada: empresa };
 
+    const tagEqFisc = ehFiscal ? `[EQ_FISCALIZADA: ${dadosAtendimento.equipeFiscalizada}] ` : "";
     await supabaseClient.from('registros_producao').upsert([{
         id: idTemp, data_registro: hojeISO, equipe, membros: equipe, projeto, imovel: idSite,
         h_entrada: horaEntrada, h_saida: "Em Andamento", gps_entrada: coordReal, gps_saida: "Em Campo",
         desfecho: "EM ANDAMENTO", motivo_desfecho: `Site ${idSite} | Anel: ${anel}`, malogros: [],
         responsavel: fiscal, contato: anel, email: empresa, andares: 0, hps: 0, servico_obra: "SIM",
-        observacoes: `[EMPRESA: ${empresa}] [ANEL: ${anel}] [FISCAL: ${fiscal}] Em andamento`
+        observacoes: `${tagEqFisc}[EMPRESA: ${empresa}] [ANEL: ${anel}] [FISCAL: ${fiscal}] Em andamento`
     }], { onConflict: 'id' });
 
     document.getElementById('lbl-imovel-aberto').innerText = `${idSite} | Anel: ${anel} (${empresa})`;
@@ -222,57 +286,49 @@ function renderizarFormularioItens5GNoCampo(projeto) {
     const container = document.getElementById('container-blocos-dinamicos');
     if (!container) return;
 
-    const classeAtiva = obterSetorDoProjeto(projeto); // "Lançamento", "Fusão" ou "Obra"
+    const classeAtiva = obterSetorDoProjeto(projeto);
+    if (classeAtiva === 'Fiscal') {
+        container.innerHTML = `
+            <div class="bg-red-50/70 p-3 rounded-xl border-2 border-red-300 space-y-2">
+                <h4 class="font-black text-red-950 text-xs uppercase">👮 Relatório de Fiscalização em Campo</h4>
+                <div class="text-xs font-bold text-slate-700">Equipe Fiscalizada: ${dadosAtendimento.equipeFiscalizada} (${dadosAtendimento.empresaSelecionada})</div>
+                <select id="sel-desfecho-site-5g" class="w-full text-xs font-black border-2 border-red-400 rounded-xl p-2.5 bg-white">
+                    <option value="CONCLUIDA">🟢 FISCALIZAÇÃO CONCLUÍDA (OK)</option>
+                    <option value="PENDENTE">🟡 PENDÊNCIA IDENTIFICADA</option>
+                    <option value="MALOGRADA">🔴 EQUIPE NÃO LOCALIZADA / MALOGRO</option>
+                </select>
+                <textarea id="inp-obs-site-5g" rows="3" placeholder="Anotações da vistoria / fiscalização..." class="w-full text-xs border border-slate-300 rounded-lg p-2"></textarea>
+            </div>`;
+        return;
+    }
+
     const itensMO = CATALOGO_MAO_DE_OBRA_5G[classeAtiva] || [];
     const matsSapClasse = CATALOGO_MATERIAIS_CLIENTE_SAP.filter(m => m.classes.includes(classeAtiva));
     const matsAxClasse = CATALOGO_MATERIAIS_PROCISA_AX.filter(m => m.classes.includes(classeAtiva));
-
     const corBadge = classeAtiva === 'Fusão' ? 'bg-blue-700' : (classeAtiva === 'Obra' ? 'bg-cyan-700' : 'bg-orange-600');
     const corBorda = classeAtiva === 'Fusão' ? 'border-blue-300 bg-blue-50/60' : (classeAtiva === 'Obra' ? 'border-cyan-300 bg-cyan-50/60' : 'border-orange-300 bg-orange-50/60');
 
     const htmlMO = itensMO.map(item => `
         <div class="py-2 px-2.5 bg-white rounded-lg border border-slate-200 flex justify-between items-center gap-2">
-            <div class="flex-1">
-                <span class="${corBadge} text-white font-mono font-black text-[10px] px-1.5 py-0.5 rounded">${item.codigo}</span>
-                <span class="font-bold text-slate-800 text-[11px] ml-1">${item.desc}</span>
-            </div>
-            <div class="flex items-center gap-1">
-                <input type="number" step="0.01" min="0" data-cod-mo="${item.codigo}" data-un-mo="${item.un}" placeholder="0" class="inp-mo-5g w-20 text-center font-black text-xs border-2 border-slate-300 rounded-lg p-1.5 bg-slate-50">
-                <span class="text-[10px] font-bold text-slate-500 w-8">${item.un}</span>
-            </div>
+            <div class="flex-1"><span class="${corBadge} text-white font-mono font-black text-[10px] px-1.5 py-0.5 rounded">${item.codigo}</span> <span class="font-bold text-slate-800 text-[11px] ml-1">${item.desc}</span></div>
+            <div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-mo="${item.codigo}" data-un-mo="${item.un}" placeholder="0" class="inp-mo-5g w-20 text-center font-black text-xs border-2 border-slate-300 rounded-lg p-1.5 bg-slate-50"><span class="text-[10px] font-bold text-slate-500 w-8">${item.un}</span></div>
         </div>`).join('');
 
     const htmlSap = matsSapClasse.length > 0 ? `
         <div class="bg-emerald-50/70 p-3 rounded-xl border-2 border-emerald-300 space-y-2">
-            <h4 class="font-black text-emerald-950 text-xs uppercase border-b border-emerald-200 pb-1">📦 2. Material Cliente Claro (SAP) — Somente ${classeAtiva.toUpperCase()}</h4>
-            <div class="space-y-1.5">
-                ${matsSapClasse.map(m => `
-                    <div class="py-1.5 px-2 bg-white rounded-lg border border-emerald-200 flex justify-between items-center gap-2">
-                        <div class="flex-1"><span class="bg-emerald-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">SAP ${m.codSap}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div>
-                        <div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-sap="${m.codSap}" placeholder="0" class="inp-mat-sap w-16 text-center font-black text-xs border border-emerald-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-7">${m.un}</span></div>
-                    </div>`).join('')}
-            </div>
+            <h4 class="font-black text-emerald-950 text-xs uppercase border-b border-emerald-200 pb-1">📦 2. Material Cliente Claro (SAP) — ${classeAtiva.toUpperCase()}</h4>
+            <div class="space-y-1.5">${matsSapClasse.map(m => `<div class="py-1.5 px-2 bg-white rounded-lg border border-emerald-200 flex justify-between items-center gap-2"><div class="flex-1"><span class="bg-emerald-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">SAP ${m.codSap}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div><div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-sap="${m.codSap}" placeholder="0" class="inp-mat-sap w-16 text-center font-black text-xs border border-emerald-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-7">${m.un}</span></div></div>`).join('')}</div>
         </div>` : '';
 
     const htmlAx = matsAxClasse.length > 0 ? `
         <div class="bg-indigo-50/70 p-3 rounded-xl border-2 border-indigo-300 space-y-2">
-            <h4 class="font-black text-indigo-950 text-xs uppercase border-b border-indigo-200 pb-1">🔩 3. Material Procisa — Somente ${classeAtiva.toUpperCase()}</h4>
-            <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                ${matsAxClasse.map(m => `
-                    <div class="py-1.5 px-2 bg-white rounded-lg border border-indigo-200 flex justify-between items-center gap-2">
-                        <div class="flex-1"><span class="bg-indigo-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">Cód ${m.codAx}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div>
-                        <div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-ax="${m.codAx}" placeholder="0" class="inp-mat-ax w-16 text-center font-black text-xs border border-indigo-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-8">${m.un}</span></div>
-                    </div>`).join('')}
-            </div>
+            <h4 class="font-black text-indigo-950 text-xs uppercase border-b border-indigo-200 pb-1">🔩 3. Material Procisa (Miscelâneas/Ferragens) — ${classeAtiva.toUpperCase()}</h4>
+            <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">${matsAxClasse.map(m => `<div class="py-1.5 px-2 bg-white rounded-lg border border-indigo-200 flex justify-between items-center gap-2"><div class="flex-1"><span class="bg-indigo-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">Cód ${m.codAx}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div><div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-ax="${m.codAx}" placeholder="0" class="inp-mat-ax w-16 text-center font-black text-xs border border-indigo-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-8">${m.un}</span></div></div>`).join('')}</div>
         </div>` : '';
 
     container.innerHTML = `
-        <div class="${corBorda} p-3 rounded-xl border-2 space-y-2">
-            <h4 class="font-black text-slate-900 text-xs uppercase border-b pb-1.5">🛠️ 1. Serviços Exclusivos de ${classeAtiva.toUpperCase()}</h4>
-            <div class="space-y-1.5 max-h-80 overflow-y-auto pr-1">${htmlMO}</div>
-        </div>
-        ${htmlSap}
-        ${htmlAx}
+        <div class="${corBorda} p-3 rounded-xl border-2 space-y-2"><h4 class="font-black text-slate-900 text-xs uppercase border-b pb-1.5">🛠️ 1. Serviços Exclusivos de ${classeAtiva.toUpperCase()}</h4><div class="space-y-1.5 max-h-80 overflow-y-auto pr-1">${htmlMO}</div></div>
+        ${htmlSap}${htmlAx}
         <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
             <label class="block text-xs font-black text-slate-800 uppercase">🎯 Desfecho do Atendimento *</label>
             <select id="sel-desfecho-site-5g" class="w-full text-xs font-black border-2 border-blue-500 rounded-xl p-2.5 bg-blue-50 text-blue-950">
@@ -311,6 +367,7 @@ async function salvarRegistro() {
         const projeto = document.getElementById('sel-projeto')?.value || "LANÇAMENTO 5G";
         const desfecho = document.getElementById('sel-desfecho-site-5g')?.value || "CONCLUIDA";
         const obsTexto = document.getElementById('inp-obs-site-5g')?.value.trim() || "";
+        const tagEqFisc = dadosAtendimento.ehFiscal ? `[EQ_FISCALIZADA: ${dadosAtendimento.equipeFiscalizada}] ` : "";
 
         const regFinal = {
             id: dadosAtendimento.idEmAndamento || Date.now(),
@@ -321,13 +378,13 @@ async function salvarRegistro() {
             malogros: Object.keys(maoObra).map(k => `Item ${k}: ${maoObra[k]}`),
             responsavel: dadosAtendimento.fiscalResponsavel, contato: dadosAtendimento.anel, email: dadosAtendimento.empresaSelecionada,
             andares: Math.round(totalMetros), hps: Math.round(totalUnidades), servico_obra: "SIM",
-            observacoes: `[END: ${endereco}] [EMPRESA: ${dadosAtendimento.empresaSelecionada}] [ANEL: ${dadosAtendimento.anel}] [FISCAL: ${dadosAtendimento.fiscalResponsavel}] [ITENS5G:${JSON.stringify({ maoObra, matSap, matAx })}] ${obsTexto}`.trim(),
+            observacoes: `${tagEqFisc}[END: ${endereco}] [EMPRESA: ${dadosAtendimento.empresaSelecionada}] [ANEL: ${dadosAtendimento.anel}] [FISCAL: ${dadosAtendimento.fiscalResponsavel}] [ITENS5G:${JSON.stringify({ maoObra, matSap, matAx })}] ${obsTexto}`.trim(),
             cabo_rl: Number(matSap["22067771"]) || 0, cx_fosc: Number(matSap["22068144"]) || 0, dio: Number(matSap["22007782"]) || 0, fusoes: Number(maoObra["3.13"]) || 0
         };
 
         const { error } = await supabaseClient.from('registros_producao').upsert([regFinal], { onConflict: 'id' });
         if (error) throw error;
-        alert(`✅ Site ${dadosAtendimento.idSite} salvo com sucesso!`);
+        alert(`✅ Site ${dadosAtendimento.idSite} finalizado com sucesso!`);
         cancelarCheckinAberto(true);
         await carregarRegistrosModoCampoLeve();
     } catch (e) { alert("❌ Erro ao salvar: " + e.message); } finally { salvandoAtendimentoTrava = false; }
@@ -344,50 +401,32 @@ async function cancelarCheckinAberto(apenasLimpar = false) {
     document.getElementById('inp-imovel').value = "";
 }
 
-// ================= SOLICITAÇÃO DE COMBUSTÍVEL COM 2 FOTOS OBRIGATÓRIAS =================
+// ================= COMBUSTÍVEL (2 FOTOS + TRAVA ANTI-DUPLICAÇÃO) =================
 function abrirModalSolicitacaoCombustivelCampo() {
-    if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe e digite seu PIN primeiro."); return; }
+    if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe/Fiscal primeiro."); return; }
     fotosSolicCombustivelTemp = { saldo: null, painel: null };
     const m = document.getElementById('modal-solic-combustivel');
     m.innerHTML = `
         <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border flex flex-col max-h-[92vh]">
-            <div class="bg-orange-600 text-white p-4 flex justify-between items-center">
-                <h3 class="font-bold text-sm">⛽ Solicitar Recarga de Combustível</h3>
-                <button onclick="fecharModalSolicitacaoCombustivelCampo()" class="font-bold text-lg">✕</button>
-            </div>
+            <div class="bg-orange-600 text-white p-4 flex justify-between items-center"><h3 class="font-bold text-sm">⛽ Solicitar Recarga de Combustível</h3><button onclick="fecharModalSolicitacaoCombustivelCampo()" class="font-bold text-lg">✕</button></div>
             <div class="p-4 overflow-y-auto space-y-3 text-xs">
-                <div class="bg-orange-50 p-2 rounded-lg font-bold text-orange-950">👷 Equipe: ${equipeAutenticadaSessao}</div>
+                <div class="bg-orange-50 p-2 rounded-lg font-bold text-orange-950">👷 Solicitante: ${equipeAutenticadaSessao}</div>
                 <div class="grid grid-cols-2 gap-2">
                     <div><label class="font-bold block mb-1">🚗 Placa *</label><input type="text" id="inp-comb-placa" placeholder="ABC-1D23" class="w-full border rounded-lg p-2 uppercase font-bold"></div>
                     <div><label class="font-bold block mb-1">🔢 KM Atual *</label><input type="number" id="inp-comb-km" placeholder="54000" class="w-full border rounded-lg p-2 font-bold"></div>
                 </div>
                 <div><label class="font-bold block mb-1">💬 Motivo</label><select id="inp-comb-motivo" class="w-full border rounded-lg p-2 bg-white">${OPCOES_COMBUSTIVEL_PADRAO.map(o => `<option value="${o}">${o}</option>`).join('')}</select></div>
-
                 <div class="space-y-2 pt-2 border-t">
                     <span class="font-black text-red-900 uppercase text-[11px] block">📷 2 Imagens Obrigatórias:</span>
-
                     <div class="bg-red-50/70 p-2.5 rounded-xl border border-red-200 flex justify-between items-center gap-2">
-                        <div class="flex-1">
-                            <span class="font-black text-red-950 block">1. Print do Saldo Zerado no App *</span>
-                            <span id="status-foto-comb-saldo" class="text-[10px] text-slate-500">Nenhuma imagem anexada</span>
-                        </div>
+                        <div class="flex-1"><span class="font-black text-red-950 block">1. Print do Saldo Zerado no App *</span><span id="status-foto-comb-saldo" class="text-[10px] text-slate-500">Nenhuma imagem</span></div>
                         <img id="prev-foto-comb-saldo" src="" class="w-10 h-10 object-cover rounded border hidden">
-                        <label class="bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg cursor-pointer whitespace-nowrap">
-                            📂 Anexar
-                            <input type="file" accept="image/*" onchange="processarFotoCombustivel5G('saldo', this)" class="hidden">
-                        </label>
+                        <label class="bg-red-600 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg cursor-pointer">📂 Anexar<input type="file" accept="image/*" onchange="processarFotoCombustivel5G('saldo', this)" class="hidden"></label>
                     </div>
-
                     <div class="bg-red-50/70 p-2.5 rounded-xl border border-red-200 flex justify-between items-center gap-2">
-                        <div class="flex-1">
-                            <span class="font-black text-red-950 block">2. Painel (Hodômetro + Combustível &lt; 1/2) *</span>
-                            <span id="status-foto-comb-painel" class="text-[10px] text-slate-500">Nenhuma imagem anexada</span>
-                        </div>
+                        <div class="flex-1"><span class="font-black text-red-950 block">2. Painel (Hodômetro + Comb. &lt; 1/2) *</span><span id="status-foto-comb-painel" class="text-[10px] text-slate-500">Nenhuma imagem</span></div>
                         <img id="prev-foto-comb-painel" src="" class="w-10 h-10 object-cover rounded border hidden">
-                        <label class="bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg cursor-pointer whitespace-nowrap">
-                            📷 Anexar
-                            <input type="file" accept="image/*" onchange="processarFotoCombustivel5G('painel', this)" class="hidden">
-                        </label>
+                        <label class="bg-red-600 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg cursor-pointer">📷 Anexar<input type="file" accept="image/*" onchange="processarFotoCombustivel5G('painel', this)" class="hidden"></label>
                     </div>
                 </div>
             </div>
@@ -398,66 +437,56 @@ function abrirModalSolicitacaoCombustivelCampo() {
         </div>`;
     m.classList.remove('hidden');
 }
-
 async function processarFotoCombustivel5G(tipo, inputEl) {
-    const file = inputEl.files && inputEl.files[0];
-    if (!file) return;
-    const st = document.getElementById(`status-foto-comb-${tipo}`);
-    const prev = document.getElementById(`prev-foto-comb-${tipo}`);
-    if (st) st.innerText = "⏳ Comprimindo imagem...";
+    const file = inputEl.files?.[0]; if (!file) return;
+    const st = document.getElementById(`status-foto-comb-${tipo}`), prev = document.getElementById(`prev-foto-comb-${tipo}`);
+    if (st) st.innerText = "⏳ Comprimindo...";
     try {
         const b64 = await comprimirImagemBase64Campo(file, 720, 0.55);
         fotosSolicCombustivelTemp[tipo] = b64;
         if (prev) { prev.src = b64; prev.classList.remove('hidden'); }
-        if (st) { st.innerText = "✅ Imagem anexada!"; st.className = "text-[10px] text-emerald-700 font-bold"; }
-    } catch (e) {
-        if (st) st.innerText = "❌ Erro ao ler imagem.";
-    }
+        if (st) { st.innerText = "✅ Anexada!"; st.className = "text-[10px] text-emerald-700 font-bold"; }
+    } catch (e) { if (st) st.innerText = "❌ Erro."; }
     inputEl.value = "";
 }
-
 function fecharModalSolicitacaoCombustivelCampo() { document.getElementById('modal-solic-combustivel')?.classList.add('hidden'); }
-
 async function enviarSolicitacaoCombustivelCampo() {
+    if (enviandoCombustivelTrava) return;
     const placa = document.getElementById('inp-comb-placa')?.value.trim().toUpperCase();
     const km = document.getElementById('inp-comb-km')?.value.trim();
     const motivo = document.getElementById('inp-comb-motivo')?.value || "Recarga extra";
-    if (!placa || !km) { alert("⚠️ Informe a Placa e o KM atual."); return; }
-    if (!fotosSolicCombustivelTemp.saldo) { alert("⚠️ Anexe o PRINT DO SALDO ZERADO NO APLICATIVO."); return; }
-    if (!fotosSolicCombustivelTemp.painel) { alert("⚠️ Anexe a FOTO DO PAINEL (Hodômetro + Combustível abaixo da metade)."); return; }
+    if (!placa || !km) { alert("⚠️ Informe Placa e KM."); return; }
+    if (!fotosSolicCombustivelTemp.saldo || !fotosSolicCombustivelTemp.painel) { alert("⚠️ Anexe as 2 imagens obrigatórias!"); return; }
 
+    enviandoCombustivelTrava = true;
     const btn = document.getElementById('btn-enviar-comb-5g');
     if (btn) { btn.disabled = true; btn.innerText = "⏳ Enviando..."; }
     try {
         const gps = await capturarGpsReal(4000);
-        const fotosArr = [fotosSolicCombustivelTemp.saldo, fotosSolicCombustivelTemp.painel];
         const { error } = await supabaseClient.from('registros_producao').insert([{
             id: Date.now(), data_registro: obterDataLocalISO(), equipe: equipeAutenticadaSessao, membros: equipeAutenticadaSessao,
             projeto: PROJETO_SOLIC_COMBUSTIVEL, imovel: `PLACA: ${placa} | KM: ${km}`,
             h_entrada: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), h_saida: "Pendente",
             gps_entrada: gps, gps_saida: "-", desfecho: "AGUARDANDO TRATATIVA", motivo_desfecho: motivo,
-            malogros: ["PRINT SALDO ZERADO", "PAINEL HODÔMETRO/COMBUSTÍVEL"], responsavel: placa, contato: km,
-            observacoes: `${motivo} [FOTOS:${JSON.stringify(fotosArr)}]`
+            malogros: ["PRINT SALDO ZERADO", "PAINEL"], responsavel: placa, contato: km,
+            observacoes: `${motivo} [FOTOS:${JSON.stringify([fotosSolicCombustivelTemp.saldo, fotosSolicCombustivelTemp.painel])}]`
         }]);
         if (error) throw error;
         fecharModalSolicitacaoCombustivelCampo();
-        alert("✅ Solicitação de Combustível com as 2 imagens enviada!");
-    } catch (e) {
-        alert("❌ Erro ao enviar: " + e.message);
-    } finally {
-        if (btn) { btn.disabled = false; btn.innerText = "🚀 Enviar Solicitação"; }
-    }
+        alert("✅ Solicitação de Combustível enviada!");
+    } catch (e) { alert("❌ Erro: " + e.message); }
+    finally { enviandoCombustivelTrava = false; if (btn) { btn.disabled = false; btn.innerText = "🚀 Enviar Solicitação"; } }
 }
 
-// ================= SOLICITAÇÃO DE MATERIAL E IMPREVISTO =================
+// ================= SOLICITAÇÃO DE MATERIAL (TRAVA ANTI-DUPLICAÇÃO) =================
 function abrirModalSolicitacaoMaterialCampo() {
-    if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe e digite seu PIN primeiro."); return; }
+    if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe/Fiscal primeiro."); return; }
     const m = document.getElementById('modal-solic-material');
     m.innerHTML = `
         <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border flex flex-col max-h-[90vh]">
             <div class="bg-indigo-800 text-white p-4 flex justify-between items-center"><h3 class="font-bold text-sm">🧰 Solicitar Material de Campo</h3><button onclick="fecharModalSolicitacaoMaterialCampo()" class="font-bold text-lg">✕</button></div>
             <div class="p-4 overflow-y-auto space-y-2 text-xs">
-                <div class="bg-indigo-50 p-2 rounded-lg font-bold text-indigo-950">👷 Equipe: ${equipeAutenticadaSessao}</div>
+                <div class="bg-indigo-50 p-2 rounded-lg font-bold text-indigo-950">👷 Solicitante: ${equipeAutenticadaSessao}</div>
                 <div class="space-y-1.5 max-h-60 overflow-y-auto border rounded-xl p-2 bg-slate-50">
                     ${OPCOES_MATERIAL_SOLICITACAO.map(item => `<div class="flex justify-between items-center gap-2 py-1 border-b"><span class="font-bold text-[10px] flex-1">${item}</span><input type="number" min="0" data-mat-item="${item}" placeholder="0" class="inp-solic-mat w-16 text-center font-bold border rounded p-1 bg-white"></div>`).join('')}
                 </div>
@@ -465,31 +494,39 @@ function abrirModalSolicitacaoMaterialCampo() {
             </div>
             <div class="bg-slate-100 p-3 flex justify-end gap-2">
                 <button onclick="fecharModalSolicitacaoMaterialCampo()" class="bg-slate-300 px-3 py-2 rounded-lg text-xs font-bold">Cancelar</button>
-                <button onclick="enviarSolicitacaoMaterialCampo()" class="bg-indigo-800 text-white px-4 py-2 rounded-lg text-xs font-black">🚀 Enviar Pedido</button>
+                <button id="btn-enviar-mat-5g" onclick="enviarSolicitacaoMaterialCampo()" class="bg-indigo-800 text-white px-4 py-2 rounded-lg text-xs font-black">🚀 Enviar Pedido</button>
             </div>
         </div>`;
     m.classList.remove('hidden');
 }
 function fecharModalSolicitacaoMaterialCampo() { document.getElementById('modal-solic-material')?.classList.add('hidden'); }
 async function enviarSolicitacaoMaterialCampo() {
+    if (enviandoMaterialTrava) return;
     const itens = [];
     document.querySelectorAll('.inp-solic-mat').forEach(inp => { const q = Number(inp.value) || 0; if (q > 0) itens.push(`${inp.dataset.matItem}: ${q}`); });
     if (itens.length === 0) { alert("⚠️ Informe a quantidade de pelo menos 1 item."); return; }
-    const obs = document.getElementById('inp-obs-solic-mat')?.value.trim() || "Solicitação de campo";
-    const { error } = await supabaseClient.from('registros_producao').insert([{
-        id: Date.now(), data_registro: obterDataLocalISO(), equipe: equipeAutenticadaSessao, membros: equipeAutenticadaSessao,
-        projeto: PROJETO_SOLIC_MATERIAL, imovel: `PEDIDO (${itens.length} itens)`,
-        h_entrada: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), h_saida: "Pendente",
-        gps_entrada: await capturarGpsReal(4000), gps_saida: "-", desfecho: "AGUARDANDO TRATATIVA",
-        motivo_desfecho: itens.join(" | "), malogros: itens, observacoes: obs
-    }]);
-    if (error) { alert("❌ Erro: " + error.message); return; }
-    fecharModalSolicitacaoMaterialCampo();
-    alert("✅ Pedido de Material enviado para a gestão!");
+
+    enviandoMaterialTrava = true;
+    const btn = document.getElementById('btn-enviar-mat-5g');
+    if (btn) { btn.disabled = true; btn.innerText = "⏳ Enviando..."; }
+    try {
+        const obs = document.getElementById('inp-obs-solic-mat')?.value.trim() || "Solicitação de campo";
+        const { error } = await supabaseClient.from('registros_producao').insert([{
+            id: Date.now(), data_registro: obterDataLocalISO(), equipe: equipeAutenticadaSessao, membros: equipeAutenticadaSessao,
+            projeto: PROJETO_SOLIC_MATERIAL, imovel: `PEDIDO (${itens.length} itens)`,
+            h_entrada: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), h_saida: "Pendente",
+            gps_entrada: await capturarGpsReal(4000), gps_saida: "-", desfecho: "AGUARDANDO TRATATIVA",
+            motivo_desfecho: itens.join(" | "), malogros: itens, observacoes: obs
+        }]);
+        if (error) throw error;
+        fecharModalSolicitacaoMaterialCampo();
+        alert("✅ Pedido único de Material enviado com sucesso!");
+    } catch (e) { alert("❌ Erro: " + e.message); }
+    finally { enviandoMaterialTrava = false; if (btn) { btn.disabled = false; btn.innerText = "🚀 Enviar Pedido"; } }
 }
 
 function abrirModalImprevisto() {
-    if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe e digite seu PIN primeiro."); return; }
+    if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe/Fiscal primeiro."); return; }
     const m = document.getElementById('modal-imprevisto');
     m.innerHTML = `
         <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border">
@@ -517,7 +554,7 @@ async function enviarImprevistoCampo() {
         gps_entrada: gps, gps_saida: gps, desfecho: "IMPREVISTO", motivo_desfecho: det ? `${mot}: ${det}` : mot, malogros: [mot], observacoes: det
     }]);
     fecharModalImprevisto();
-    alert("⚠️ Imprevisto registrado no painel de gestão!");
+    alert("⚠️ Imprevisto registrado!");
 }
 
 function mudarSubAbaCampo(aba) {
