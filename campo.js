@@ -1,10 +1,14 @@
-// ================= CAMPO.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V4) =================
+// ================= CAMPO.JS - SETOR CONSTRUÇÃO 5G PROCISA RJ (V5 - ALMOÇO NA ATIVIDADE & SEM ENDEREÇO MANUAL) =================
 let salvandoAtendimentoTrava = false;
 let enviandoMaterialTrava = false;
 let enviandoCombustivelTrava = false;
 let fotosSolicCombustivelTemp = { saldo: null, painel: null };
 
 function inicializarCamposExtras5GCampo() {
+    // Oculta o campo de endereço manual (GPS já faz a localização)
+    const inpEnd = document.getElementById('form-endereco');
+    if (inpEnd && inpEnd.parentNode) inpEnd.parentNode.classList.add('hidden');
+
     const inpImovel = document.getElementById('inp-imovel');
     if (inpImovel && !document.getElementById('box-campos-5g-abertura')) {
         inpImovel.placeholder = "Ex: RJ-NDB-001";
@@ -26,14 +30,8 @@ function inicializarCamposExtras5GCampo() {
                 <div id="lbl-tipo-equipe-fiscalizada" class="text-[11px] font-black text-blue-900"></div>
             </div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">🔄 ANEL *</label>
-                    <input type="text" id="inp-anel-campo" placeholder="Ex: ANEL-01" class="w-full text-xs font-bold uppercase border border-slate-300 rounded-lg p-2.5 outline-none">
-                </div>
-                <div>
-                    <label id="lbl-fiscal-ou-gestor" class="block text-xs font-semibold text-slate-600 mb-1">👮 Fiscal Responsável *</label>
-                    <select id="sel-fiscal-campo" class="w-full text-xs font-bold border border-slate-300 rounded-lg p-2.5 bg-white text-slate-800 outline-none"></select>
-                </div>
+                <div><label class="block text-xs font-semibold text-slate-600 mb-1">🔄 ANEL *</label><input type="text" id="inp-anel-campo" placeholder="Ex: ANEL-01" class="w-full text-xs font-bold uppercase border border-slate-300 rounded-lg p-2.5 outline-none"></div>
+                <div><label id="lbl-fiscal-ou-gestor" class="block text-xs font-semibold text-slate-600 mb-1">👮 Fiscal Responsável *</label><select id="sel-fiscal-campo" class="w-full text-xs font-bold border border-slate-300 rounded-lg p-2.5 bg-white text-slate-800 outline-none"></select></div>
             </div>`;
         inpImovel.parentNode.after(box5G);
     }
@@ -44,14 +42,11 @@ function popularSelectEmpresasEFiscaisCampo() {
     const selEmp = document.getElementById('sel-empresa-campo');
     if (selEmp) selEmp.innerHTML = (PARCEIROS_SISTEMA || []).filter(p => p.nome !== "PROCISA").map(p => `<option value="${p.nome}">🏢 ${p.nome}</option>`).join('');
     const selFisc = document.getElementById('sel-fiscal-campo');
-    if (selFisc && !dadosAtendimento.ehFiscal) {
-        selFisc.innerHTML = (FISCAIS_SISTEMA || []).map(f => `<option value="${f.nome}">👮 ${f.nome} (${f.regiao})</option>`).join('');
-    }
+    if (selFisc && !dadosAtendimento.ehFiscal) selFisc.innerHTML = (FISCAIS_SISTEMA || []).map(f => `<option value="${f.nome}">👮 ${f.nome} (${f.regiao})</option>`).join('');
     const selEqF = document.getElementById('sel-equipe-fiscalizada');
     if (selEqF) {
         const cabecas = (equipesSistema || []).filter(e => e.status === "Ativo" && ehCabecaDeEquipe(e));
-        selEqF.innerHTML = '<option value="">Selecione a equipe fiscalizada...</option>' +
-            cabecas.map(e => `<option value="${e.nome}">${e.nome} (${e.setor} • ${e.empresa})</option>`).join('');
+        selEqF.innerHTML = '<option value="">Selecione a equipe fiscalizada...</option>' + cabecas.map(e => `<option value="${e.nome}">${e.nome} (${e.setor} • ${e.empresa})</option>`).join('');
     }
 }
 
@@ -89,7 +84,6 @@ function aoSelecionarEquipeCampo() {
 
     const ehFiscal = ehPerfilFiscalCampo(eq);
     dadosAtendimento.ehFiscal = ehFiscal;
-
     const eqObj = (equipesSistema || []).find(e => e.nome === eq);
     const fiscObj = (FISCAIS_SISTEMA || []).find(f => f.nome === eq);
     const pinCorreto = ehFiscal ? (fiscObj?.matricula || "1234") : obterPinDaEquipe(eqObj);
@@ -102,8 +96,6 @@ function aoSelecionarEquipeCampo() {
     }
 
     document.getElementById('current-user-team').innerText = eq;
-
-    // Ajustes específicos para Perfil Fiscal vs Equipe
     const boxEmp = document.getElementById('box-empresa-executante-campo');
     const boxEqFisc = document.getElementById('box-equipe-fiscalizada-campo');
     const lblFiscGestor = document.getElementById('lbl-fiscal-ou-gestor');
@@ -134,7 +126,6 @@ function aoSelecionarEquipeCampo() {
         }
         atualizarProjetosPermitidosCampo(eq, false);
     }
-
     atualizarBarraSegurancaPinCampo();
     document.getElementById('box-controle-expediente-campo')?.classList.remove('hidden');
 }
@@ -195,20 +186,6 @@ function comprimirImagemBase64Campo(arquivo, larguraMaxima = 720, qualidade = 0.
     });
 }
 
-async function registrarPausaAlmocoCampo() {
-    if (!equipeAutenticadaSessao) return;
-    const inicio = prompt("🍽️ Horário de INÍCIO do Almoço (Ex: 12:00):", "12:00");
-    if (!inicio) return;
-    const fim = prompt("🍽️ Horário de RETORNO do Almoço (Ex: 13:00):", "13:00");
-    if (!fim) return;
-    const hoje = obterDataLocalISO();
-    await sincronizarTelemetriaNaNuvem(equipeAutenticadaSessao, {
-        ...(telemetriaEquipes[equipeAutenticadaSessao] || {}),
-        equipe: equipeAutenticadaSessao, data: hoje, almocoInicio: inicio.trim(), almocoFim: fim.trim()
-    });
-    alert(`🍽️ Pausa de Almoço (${inicio} às ${fim}) registrada no Console de Disponibilidade!`);
-}
-
 async function iniciarExpedienteRastreioCampo() {
     const nomeEq = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     if (!nomeEq) return;
@@ -236,7 +213,57 @@ async function encerrarExpedienteRastreioCampo() {
     document.getElementById('btn-encerrar-expediente-campo')?.classList.add('hidden');
 }
 
-// ================= CHECK-IN NO SITE (EQUIPE OU FISCAL) =================
+// ================= INICIAR E CONCLUIR ALMOÇO DENTRO DA ATIVIDADE EM ANDAMENTO =================
+async function iniciarAlmocoNaAtividade() {
+    const equipe = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
+    if (!equipe) return;
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    dadosAtendimento.emAlmoco = true;
+    dadosAtendimento.almocoInicio = hora;
+    dadosAtendimento.almocoFim = null;
+
+    await sincronizarTelemetriaNaNuvem(equipe, {
+        ...(telemetriaEquipes[equipe] || {}), equipe, data: obterDataLocalISO(),
+        almocoInicio: hora, almocoFim: null, emAlmoco: true
+    });
+    atualizarBotaoAlmocoNaAtividade();
+    alert(`🍽️ Almoço iniciado às ${hora}! Sua atividade segue em andamento e o bloco fúcsia já aparece no Console.`);
+}
+
+async function concluirAlmocoNaAtividade() {
+    const equipe = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
+    if (!equipe) return;
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    dadosAtendimento.emAlmoco = false;
+    dadosAtendimento.almocoFim = hora;
+
+    await sincronizarTelemetriaNaNuvem(equipe, {
+        ...(telemetriaEquipes[equipe] || {}), equipe, data: obterDataLocalISO(),
+        almocoInicio: dadosAtendimento.almocoInicio, almocoFim: hora, emAlmoco: false
+    });
+    atualizarBotaoAlmocoNaAtividade();
+    alert(`✅ Almoço concluído às ${hora}! Atividade retomada automaticamente.`);
+}
+
+function atualizarBotaoAlmocoNaAtividade() {
+    const box = document.getElementById('box-controle-almoco-atividade');
+    if (!box) return;
+    if (dadosAtendimento.emAlmoco) {
+        box.innerHTML = `<div class="bg-fuchsia-100 border-2 border-fuchsia-500 p-2.5 rounded-xl flex justify-between items-center gap-2">
+            <span class="text-xs font-black text-fuchsia-950">🍽️ EM ALMOÇO desde ${dadosAtendimento.almocoInicio}</span>
+            <button type="button" onclick="concluirAlmocoNaAtividade()" class="bg-fuchsia-700 hover:bg-fuchsia-800 text-white text-xs font-black px-3 py-1.5 rounded-lg shadow">✅ Concluir Almoço</button>
+        </div>`;
+    } else if (dadosAtendimento.almocoFim) {
+        box.innerHTML = `<div class="bg-fuchsia-50 border border-fuchsia-300 p-2 rounded-xl flex justify-between items-center text-[11px] font-bold text-fuchsia-900">
+            <span>🍽️ Almoço registrado: ${dadosAtendimento.almocoInicio} às ${dadosAtendimento.almocoFim}</span>
+            <span class="text-emerald-700">✅ Retomado</span>
+        </div>`;
+    } else {
+        box.innerHTML = `<button type="button" onclick="iniciarAlmocoNaAtividade()" class="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-black py-2 rounded-xl shadow-sm">🍽️ Iniciar Almoço (Pausa na Atividade)</button>`;
+    }
+}
+
+// ================= CHECK-IN NO SITE =================
 async function fazerCheckIn() {
     const equipe = document.getElementById('sel-equipe')?.value || equipeAutenticadaSessao;
     const projeto = document.getElementById('sel-projeto')?.value;
@@ -260,7 +287,7 @@ async function fazerCheckIn() {
         horaInicio: telemetriaEquipes[equipe]?.horaInicio || horaEntrada, lat, lng, horaUltimoSinal: horaEntrada
     });
 
-    dadosAtendimento = { ...dadosAtendimento, idEmAndamento: idTemp, hEntrada: horaEntrada, gpsEntrada: coordReal, idSite, anel, fiscalResponsavel: fiscal, empresaSelecionada: empresa };
+    dadosAtendimento = { ...dadosAtendimento, idEmAndamento: idTemp, hEntrada: horaEntrada, gpsEntrada: coordReal, idSite, anel, fiscalResponsavel: fiscal, empresaSelecionada: empresa, emAlmoco: false, almocoInicio: null, almocoFim: null };
 
     const tagEqFisc = ehFiscal ? `[EQ_FISCALIZADA: ${dadosAtendimento.equipeFiscalizada}] ` : "";
     await supabaseClient.from('registros_producao').upsert([{
@@ -287,8 +314,10 @@ function renderizarFormularioItens5GNoCampo(projeto) {
     if (!container) return;
 
     const classeAtiva = obterSetorDoProjeto(projeto);
+    const blocoAlmocoHtml = `<div id="box-controle-almoco-atividade" class="mb-2"></div>`;
+
     if (classeAtiva === 'Fiscal') {
-        container.innerHTML = `
+        container.innerHTML = blocoAlmocoHtml + `
             <div class="bg-red-50/70 p-3 rounded-xl border-2 border-red-300 space-y-2">
                 <h4 class="font-black text-red-950 text-xs uppercase">👮 Relatório de Fiscalização em Campo</h4>
                 <div class="text-xs font-bold text-slate-700">Equipe Fiscalizada: ${dadosAtendimento.equipeFiscalizada} (${dadosAtendimento.empresaSelecionada})</div>
@@ -299,6 +328,7 @@ function renderizarFormularioItens5GNoCampo(projeto) {
                 </select>
                 <textarea id="inp-obs-site-5g" rows="3" placeholder="Anotações da vistoria / fiscalização..." class="w-full text-xs border border-slate-300 rounded-lg p-2"></textarea>
             </div>`;
+        atualizarBotaoAlmocoNaAtividade();
         return;
     }
 
@@ -308,25 +338,11 @@ function renderizarFormularioItens5GNoCampo(projeto) {
     const corBadge = classeAtiva === 'Fusão' ? 'bg-blue-700' : (classeAtiva === 'Obra' ? 'bg-cyan-700' : 'bg-orange-600');
     const corBorda = classeAtiva === 'Fusão' ? 'border-blue-300 bg-blue-50/60' : (classeAtiva === 'Obra' ? 'border-cyan-300 bg-cyan-50/60' : 'border-orange-300 bg-orange-50/60');
 
-    const htmlMO = itensMO.map(item => `
-        <div class="py-2 px-2.5 bg-white rounded-lg border border-slate-200 flex justify-between items-center gap-2">
-            <div class="flex-1"><span class="${corBadge} text-white font-mono font-black text-[10px] px-1.5 py-0.5 rounded">${item.codigo}</span> <span class="font-bold text-slate-800 text-[11px] ml-1">${item.desc}</span></div>
-            <div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-mo="${item.codigo}" data-un-mo="${item.un}" placeholder="0" class="inp-mo-5g w-20 text-center font-black text-xs border-2 border-slate-300 rounded-lg p-1.5 bg-slate-50"><span class="text-[10px] font-bold text-slate-500 w-8">${item.un}</span></div>
-        </div>`).join('');
+    const htmlMO = itensMO.map(item => `<div class="py-2 px-2.5 bg-white rounded-lg border border-slate-200 flex justify-between items-center gap-2"><div class="flex-1"><span class="${corBadge} text-white font-mono font-black text-[10px] px-1.5 py-0.5 rounded">${item.codigo}</span> <span class="font-bold text-slate-800 text-[11px] ml-1">${item.desc}</span></div><div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-mo="${item.codigo}" data-un-mo="${item.un}" placeholder="0" class="inp-mo-5g w-20 text-center font-black text-xs border-2 border-slate-300 rounded-lg p-1.5 bg-slate-50"><span class="text-[10px] font-bold text-slate-500 w-8">${item.un}</span></div></div>`).join('');
+    const htmlSap = matsSapClasse.length > 0 ? `<div class="bg-emerald-50/70 p-3 rounded-xl border-2 border-emerald-300 space-y-2"><h4 class="font-black text-emerald-950 text-xs uppercase border-b border-emerald-200 pb-1">📦 2. Material Cliente Claro (SAP) — ${classeAtiva.toUpperCase()}</h4><div class="space-y-1.5">${matsSapClasse.map(m => `<div class="py-1.5 px-2 bg-white rounded-lg border border-emerald-200 flex justify-between items-center gap-2"><div class="flex-1"><span class="bg-emerald-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">SAP ${m.codSap}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div><div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-sap="${m.codSap}" placeholder="0" class="inp-mat-sap w-16 text-center font-black text-xs border border-emerald-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-7">${m.un}</span></div></div>`).join('')}</div></div>` : '';
+    const htmlAx = matsAxClasse.length > 0 ? `<div class="bg-indigo-50/70 p-3 rounded-xl border-2 border-indigo-300 space-y-2"><h4 class="font-black text-indigo-950 text-xs uppercase border-b border-indigo-200 pb-1">🔩 3. Material Procisa (Miscelâneas/Ferragens) — ${classeAtiva.toUpperCase()}</h4><div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">${matsAxClasse.map(m => `<div class="py-1.5 px-2 bg-white rounded-lg border border-indigo-200 flex justify-between items-center gap-2"><div class="flex-1"><span class="bg-indigo-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">Cód ${m.codAx}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div><div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-ax="${m.codAx}" placeholder="0" class="inp-mat-ax w-16 text-center font-black text-xs border border-indigo-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-8">${m.un}</span></div></div>`).join('')}</div></div>` : '';
 
-    const htmlSap = matsSapClasse.length > 0 ? `
-        <div class="bg-emerald-50/70 p-3 rounded-xl border-2 border-emerald-300 space-y-2">
-            <h4 class="font-black text-emerald-950 text-xs uppercase border-b border-emerald-200 pb-1">📦 2. Material Cliente Claro (SAP) — ${classeAtiva.toUpperCase()}</h4>
-            <div class="space-y-1.5">${matsSapClasse.map(m => `<div class="py-1.5 px-2 bg-white rounded-lg border border-emerald-200 flex justify-between items-center gap-2"><div class="flex-1"><span class="bg-emerald-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">SAP ${m.codSap}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div><div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-sap="${m.codSap}" placeholder="0" class="inp-mat-sap w-16 text-center font-black text-xs border border-emerald-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-7">${m.un}</span></div></div>`).join('')}</div>
-        </div>` : '';
-
-    const htmlAx = matsAxClasse.length > 0 ? `
-        <div class="bg-indigo-50/70 p-3 rounded-xl border-2 border-indigo-300 space-y-2">
-            <h4 class="font-black text-indigo-950 text-xs uppercase border-b border-indigo-200 pb-1">🔩 3. Material Procisa (Miscelâneas/Ferragens) — ${classeAtiva.toUpperCase()}</h4>
-            <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">${matsAxClasse.map(m => `<div class="py-1.5 px-2 bg-white rounded-lg border border-indigo-200 flex justify-between items-center gap-2"><div class="flex-1"><span class="bg-indigo-800 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded">Cód ${m.codAx}</span> <span class="font-bold text-slate-800 text-[10px]">${m.desc}</span></div><div class="flex items-center gap-1"><input type="number" step="0.01" min="0" data-cod-ax="${m.codAx}" placeholder="0" class="inp-mat-ax w-16 text-center font-black text-xs border border-indigo-300 rounded p-1"><span class="text-[9px] font-bold text-slate-500 w-8">${m.un}</span></div></div>`).join('')}</div>
-        </div>` : '';
-
-    container.innerHTML = `
+    container.innerHTML = blocoAlmocoHtml + `
         <div class="${corBorda} p-3 rounded-xl border-2 space-y-2"><h4 class="font-black text-slate-900 text-xs uppercase border-b pb-1.5">🛠️ 1. Serviços Exclusivos de ${classeAtiva.toUpperCase()}</h4><div class="space-y-1.5 max-h-80 overflow-y-auto pr-1">${htmlMO}</div></div>
         ${htmlSap}${htmlAx}
         <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
@@ -338,12 +354,12 @@ function renderizarFormularioItens5GNoCampo(projeto) {
             </select>
             <textarea id="inp-obs-site-5g" rows="2" placeholder="Observações técnicas..." class="w-full text-xs border border-slate-300 rounded-lg p-2"></textarea>
         </div>`;
+    atualizarBotaoAlmocoNaAtividade();
 }
 
 async function salvarRegistro() {
     if (salvandoAtendimentoTrava) return;
-    const endereco = document.getElementById('form-endereco')?.value.trim();
-    if (!endereco) { alert("⚠️ Informe o Endereço / Bairro do Site!"); return; }
+    if (dadosAtendimento.emAlmoco) { alert("⚠️ Conclua o Almoço antes de finalizar a atividade!"); return; }
 
     salvandoAtendimentoTrava = true;
     try {
@@ -368,6 +384,7 @@ async function salvarRegistro() {
         const desfecho = document.getElementById('sel-desfecho-site-5g')?.value || "CONCLUIDA";
         const obsTexto = document.getElementById('inp-obs-site-5g')?.value.trim() || "";
         const tagEqFisc = dadosAtendimento.ehFiscal ? `[EQ_FISCALIZADA: ${dadosAtendimento.equipeFiscalizada}] ` : "";
+        const tagAlmoco = dadosAtendimento.almocoInicio ? `[ALMOCO_INI: ${dadosAtendimento.almocoInicio}] [ALMOCO_FIM: ${dadosAtendimento.almocoFim || horaSaida}] ` : "";
 
         const regFinal = {
             id: dadosAtendimento.idEmAndamento || Date.now(),
@@ -378,7 +395,7 @@ async function salvarRegistro() {
             malogros: Object.keys(maoObra).map(k => `Item ${k}: ${maoObra[k]}`),
             responsavel: dadosAtendimento.fiscalResponsavel, contato: dadosAtendimento.anel, email: dadosAtendimento.empresaSelecionada,
             andares: Math.round(totalMetros), hps: Math.round(totalUnidades), servico_obra: "SIM",
-            observacoes: `${tagEqFisc}[END: ${endereco}] [EMPRESA: ${dadosAtendimento.empresaSelecionada}] [ANEL: ${dadosAtendimento.anel}] [FISCAL: ${dadosAtendimento.fiscalResponsavel}] [ITENS5G:${JSON.stringify({ maoObra, matSap, matAx })}] ${obsTexto}`.trim(),
+            observacoes: `${tagEqFisc}${tagAlmoco}[EMPRESA: ${dadosAtendimento.empresaSelecionada}] [ANEL: ${dadosAtendimento.anel}] [FISCAL: ${dadosAtendimento.fiscalResponsavel}] [ITENS5G:${JSON.stringify({ maoObra, matSap, matAx })}] ${obsTexto}`.trim(),
             cabo_rl: Number(matSap["22067771"]) || 0, cx_fosc: Number(matSap["22068144"]) || 0, dio: Number(matSap["22007782"]) || 0, fusoes: Number(maoObra["3.13"]) || 0
         };
 
@@ -478,7 +495,7 @@ async function enviarSolicitacaoCombustivelCampo() {
     finally { enviandoCombustivelTrava = false; if (btn) { btn.disabled = false; btn.innerText = "🚀 Enviar Solicitação"; } }
 }
 
-// ================= SOLICITAÇÃO DE MATERIAL (TRAVA ANTI-DUPLICAÇÃO) =================
+// ================= SOLICITAÇÃO DE MATERIAL (COM CÓDIGOS OFICIAIS + SITE) =================
 function abrirModalSolicitacaoMaterialCampo() {
     if (!equipeAutenticadaSessao) { alert("⚠️ Selecione sua Equipe/Fiscal primeiro."); return; }
     const m = document.getElementById('modal-solic-material');
@@ -486,9 +503,10 @@ function abrirModalSolicitacaoMaterialCampo() {
         <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border flex flex-col max-h-[90vh]">
             <div class="bg-indigo-800 text-white p-4 flex justify-between items-center"><h3 class="font-bold text-sm">🧰 Solicitar Material de Campo</h3><button onclick="fecharModalSolicitacaoMaterialCampo()" class="font-bold text-lg">✕</button></div>
             <div class="p-4 overflow-y-auto space-y-2 text-xs">
-                <div class="bg-indigo-50 p-2 rounded-lg font-bold text-indigo-950">👷 Solicitante: ${equipeAutenticadaSessao}</div>
+                <div class="bg-indigo-50 p-2 rounded-lg font-bold text-indigo-950">👷 Equipe: ${equipeAutenticadaSessao}</div>
+                <div><label class="font-bold block mb-1">📡 SITE (Opcional)</label><input type="text" id="inp-site-solic-mat" value="${dadosAtendimento.idSite || ''}" placeholder="Ex: RJ-NDB-001" class="w-full border rounded-lg p-2 uppercase font-bold"></div>
                 <div class="space-y-1.5 max-h-60 overflow-y-auto border rounded-xl p-2 bg-slate-50">
-                    ${OPCOES_MATERIAL_SOLICITACAO.map(item => `<div class="flex justify-between items-center gap-2 py-1 border-b"><span class="font-bold text-[10px] flex-1">${item}</span><input type="number" min="0" data-mat-item="${item}" placeholder="0" class="inp-solic-mat w-16 text-center font-bold border rounded p-1 bg-white"></div>`).join('')}
+                    ${CATALOGO_SOLIC_MATERIAL_5G.map(item => `<div class="flex justify-between items-center gap-2 py-1 border-b"><div class="flex-1"><span class="bg-indigo-900 text-white font-mono text-[9px] px-1 rounded">${item.codigo}</span> <span class="font-bold text-[10px]">${item.nome}</span></div><input type="number" min="0" data-cod="${item.codigo}" data-nome="${item.nome}" placeholder="0" class="inp-solic-mat w-16 text-center font-bold border rounded p-1 bg-white"></div>`).join('')}
                 </div>
                 <input type="text" id="inp-obs-solic-mat" placeholder="Observações / Urgência..." class="w-full border rounded-lg p-2">
             </div>
@@ -503,24 +521,32 @@ function fecharModalSolicitacaoMaterialCampo() { document.getElementById('modal-
 async function enviarSolicitacaoMaterialCampo() {
     if (enviandoMaterialTrava) return;
     const itens = [];
-    document.querySelectorAll('.inp-solic-mat').forEach(inp => { const q = Number(inp.value) || 0; if (q > 0) itens.push(`${inp.dataset.matItem}: ${q}`); });
+    document.querySelectorAll('.inp-solic-mat').forEach(inp => {
+        const q = Number(inp.value) || 0;
+        if (q > 0) itens.push(`${inp.dataset.cod}::${inp.dataset.nome}::${q}`);
+    });
     if (itens.length === 0) { alert("⚠️ Informe a quantidade de pelo menos 1 item."); return; }
 
     enviandoMaterialTrava = true;
     const btn = document.getElementById('btn-enviar-mat-5g');
     if (btn) { btn.disabled = true; btn.innerText = "⏳ Enviando..."; }
     try {
+        const eqObj = (equipesSistema || []).find(e => e.nome === equipeAutenticadaSessao);
+        const emp = eqObj?.empresa || dadosAtendimento.empresaSelecionada || "PROCISA";
+        const fisc = eqObj?.fiscal || dadosAtendimento.fiscalResponsavel || "DIOGO SAVIO";
+        const site = document.getElementById('inp-site-solic-mat')?.value.trim().toUpperCase() || "GERAL";
         const obs = document.getElementById('inp-obs-solic-mat')?.value.trim() || "Solicitação de campo";
         const { error } = await supabaseClient.from('registros_producao').insert([{
             id: Date.now(), data_registro: obterDataLocalISO(), equipe: equipeAutenticadaSessao, membros: equipeAutenticadaSessao,
-            projeto: PROJETO_SOLIC_MATERIAL, imovel: `PEDIDO (${itens.length} itens)`,
+            projeto: PROJETO_SOLIC_MATERIAL, imovel: site,
             h_entrada: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), h_saida: "Pendente",
             gps_entrada: await capturarGpsReal(4000), gps_saida: "-", desfecho: "AGUARDANDO TRATATIVA",
-            motivo_desfecho: itens.join(" | "), malogros: itens, observacoes: obs
+            motivo_desfecho: itens.join(" | "), malogros: itens, responsavel: fisc, email: emp,
+            observacoes: `[EMPRESA: ${emp}] [FISCAL: ${fisc}] ${obs}`
         }]);
         if (error) throw error;
         fecharModalSolicitacaoMaterialCampo();
-        alert("✅ Pedido único de Material enviado com sucesso!");
+        alert("✅ Pedido único de Material enviado!");
     } catch (e) { alert("❌ Erro: " + e.message); }
     finally { enviandoMaterialTrava = false; if (btn) { btn.disabled = false; btn.innerText = "🚀 Enviar Pedido"; } }
 }
